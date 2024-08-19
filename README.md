@@ -6,6 +6,7 @@ Simple HTTP server to save artifacts
 - [Usage](#usage)
 - [Authentication](#authentication)
 - [TLS](#tls)
+- [Timeouts](#timeouts)
 - [Testing](#testing)
 - [API](#api)
   - [`POST /upload`](#post-upload)
@@ -20,25 +21,29 @@ Simple HTTP server to save artifacts
 
 ```
   -addr string
-        address to listen (default "127.0.0.1:8080")
+        address to listen
   -config string
         path to config file
   -document_root string
-        path to document root directory (default ".")
+        path to document root directory
   -enable_auth
         enable authentication
   -enable_cors
-        enable CORS header (default true)
+        enable CORS header
   -file_naming_strategy string
-        File naming strategy (default "uuid")
+        File naming strategy
   -max_upload_size int
-        max upload size in bytes (default 1048576)
+        max upload size in bytes
   -read_only_tokens value
         comma separated list of read only tokens
+  -read_timeout duration
+        read timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms'). If no suffix is provided, it is interpreted as seconds.
   -read_write_tokens value
         comma separated list of read write tokens
   -shutdown_timeout int
-        graceful shutdown timeout in milliseconds (default 15000)
+        graceful shutdown timeout in milliseconds
+  -write_timeout duration
+        write timeout. zero or negative value means no timeout. same format as read_timeout.
 ```
 
 Configurations via the arguments take precedence over those came from the config file.
@@ -78,6 +83,28 @@ As a result, the server operates like read-only mode.
 v1 has TLS support but I decided to omit it from v2.
 
 Please consider using a reverse proxy like nginx.
+
+## Timeouts
+
+(Since v2.1.0)
+
+There are 2 timeout configurations: read and write.
+The terms "read" and "write" are from the server's perspective. From clients, they are "upload" (`POST`/`PUT`) and "download" (`GET`) respectively.
+
+Read timeout (`-read_timeout`) is the maximum duration for the server reading the request.
+Clients should finish sending request headers and the entire content within this timeout.
+This is set to 15 seconds by default.
+
+Write timeout (`-write_timeout`) is the maximum duration for the server writing the response.
+Clients should finish downloading the content within this timeout.
+This timeout is not set by default. Before v2.1.0, this is set to 15 seconds.
+
+Please consider changing these timeout if:
+
+* the server or the clients are in a low-bandwidth network.
+* you are working with large files.
+
+Note that a longer timeout will result in more connections being maintained.
 
 ## Testing
 

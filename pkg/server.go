@@ -59,6 +59,10 @@ type ServerConfig struct {
 	ReadOnlyTokens []string `json:"read_only_tokens"`
 	// Authentication tokens for read-write access.
 	ReadWriteTokens []string `json:"read_write_tokens"`
+	// ReadTimeout is the maximum duration (in seconds) for reading the entire request, including the body. Zero or negative value means no timeout.
+	ReadTimeout time.Duration `json:"read_timeout"`
+	// WriteTimeout is the maximum duration (in seconds) for writing the response. Zero or negative value means no timeout.
+	WriteTimeout time.Duration `json:"write_timeout"`
 }
 
 // NewServer creates a new Server.
@@ -101,8 +105,8 @@ func (s *Server) Start(ctx context.Context, ready chan struct{}) error {
 
 	srv := &http.Server{
 		Addr:         addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: s.WriteTimeout,
+		ReadTimeout:  s.ReadTimeout,
 		IdleTimeout:  60 * time.Second,
 		Handler:      r,
 	}

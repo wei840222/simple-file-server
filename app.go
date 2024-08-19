@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 
 	"dario.cat/mergo"
 	simpleuploadserver "github.com/mayth/go-simple-upload-server/v2/pkg"
@@ -27,6 +28,8 @@ var DefaultConfig = ServerConfig{
 	EnableAuth:         nil,
 	ReadOnlyTokens:     []string{},
 	ReadWriteTokens:    []string{},
+	ReadTimeout:        Duration(15 * time.Second),
+	WriteTimeout:       0,
 }
 
 func BoolPointer(v bool) *bool {
@@ -78,6 +81,32 @@ func (f stringArrayFlag) String() string {
 	return strings.Join(f, ",")
 }
 
+type Duration time.Duration
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(d).Seconds())
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	var v interface{}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch t := v.(type) {
+	case float64:
+		*d = Duration(time.Duration(t) * time.Second)
+	case string:
+		dur, err := time.ParseDuration(t)
+		if err != nil {
+			return err
+		}
+		*d = Duration(dur)
+	default:
+		return fmt.Errorf("invalid duration type: %T", t)
+	}
+	return nil
+}
+
 // ServerConfig wraps simpleuploadserver.ServerConfig to provide JSON marshaling.
 type ServerConfig struct {
 	// Address where the server listens on.
@@ -98,6 +127,10 @@ type ServerConfig struct {
 	ReadOnlyTokens []string `json:"read_only_tokens"`
 	// Authentication tokens for read-write access.
 	ReadWriteTokens []string `json:"read_write_tokens"`
+	// ReadTimeout is the maximum duration for reading the entire request, including the body. Zero or negative value means no timeout.
+	ReadTimeout Duration `json:"read_timeout"`
+	// WriteTimeout is the maximum duration for writing the response. Zero or negative value means no timeout.
+	WriteTimeout Duration `json:"write_timeout"`
 }
 
 func (c *ServerConfig) AsConfig() simpleuploadserver.ServerConfig {
@@ -118,6 +151,8 @@ func (c *ServerConfig) AsConfig() simpleuploadserver.ServerConfig {
 		EnableAuth:         *c.EnableAuth,
 		ReadOnlyTokens:     c.ReadOnlyTokens,
 		ReadWriteTokens:    c.ReadWriteTokens,
+		ReadTimeout:        time.Duration(c.ReadTimeout),
+		WriteTimeout:       time.Duration(c.WriteTimeout),
 	}
 }
 
@@ -137,6 +172,8 @@ type app struct {
 	enableAuth         boolOptFlag
 	readOnlyTokens     stringArrayFlag
 	readWriteTokens    stringArrayFlag
+	readTimeout        time.Duration
+	writeTimeout       time.Duration
 }
 
 func NewApp(name string) *app {
@@ -152,6 +189,8 @@ func NewApp(name string) *app {
 	fs.Var(&a.enableAuth, "enable_auth", "enable authentication")
 	fs.Var(&a.readOnlyTokens, "read_only_tokens", "comma separated list of read only tokens")
 	fs.Var(&a.readWriteTokens, "read_write_tokens", "comma separated list of read write tokens")
+	fs.DurationVar(&a.readTimeout, "read_timeout", 0, "read timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms'). If no suffix is provided, it is interpreted as seconds.")
+	fs.DurationVar(&a.writeTimeout, "write_timeout", 0, "write timeout. zero or negative value means no timeout. same format as read_timeout.")
 	a.flagSet = fs
 	return a
 }
@@ -230,6 +269,8 @@ func (a *app) ParseConfig(args []string) (*simpleuploadserver.ServerConfig, erro
 		ShutdownTimeout:    a.shutdownTimeout,
 		ReadOnlyTokens:     a.readOnlyTokens,
 		ReadWriteTokens:    a.readWriteTokens,
+		ReadTimeout:        Duration(a.readTimeout),
+		WriteTimeout:       Duration(a.writeTimeout),
 	}
 	if a.enableCORS.IsSet() {
 		configFromFlags.EnableCORS = &a.enableCORS.value

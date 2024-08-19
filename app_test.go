@@ -4,6 +4,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	simpleuploadserver "github.com/mayth/go-simple-upload-server/v2/pkg"
 )
@@ -25,7 +26,9 @@ func Test_parseConfig(t *testing.T) {
 			"shutdown_timeout": 15000,
 			"enable_auth": true,
 			"read_only_tokens": ["foo", "bar"],
-			"read_write_tokens": ["baz", "qux"]
+			"read_write_tokens": ["baz", "qux"],
+			"read_timeout": "5s",
+			"write_timeout": "10s"
 		}`); err != nil {
 			t.Fatalf("failed to write to temp file: %v", err)
 		}
@@ -52,6 +55,8 @@ func Test_parseConfig(t *testing.T) {
 			EnableAuth:         true,
 			ReadOnlyTokens:     []string{"foo", "bar"},
 			ReadWriteTokens:    []string{"baz", "qux"},
+			ReadTimeout:        5 * time.Second,
+			WriteTimeout:       10 * time.Second,
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("parseConfig() = %v, want %v", got, want)
@@ -70,6 +75,8 @@ func Test_parseConfig(t *testing.T) {
 			"-enable_auth=true",
 			"-read_only_tokens", "foo,bar",
 			"-read_write_tokens", "baz,qux",
+			"-read_timeout", "7s",
+			"-write_timeout", "12s",
 		}
 		got, err := app.ParseConfig(args)
 		if err != nil {
@@ -86,6 +93,8 @@ func Test_parseConfig(t *testing.T) {
 			EnableAuth:         true,
 			ReadOnlyTokens:     []string{"foo", "bar"},
 			ReadWriteTokens:    []string{"baz", "qux"},
+			ReadTimeout:        7 * time.Second,
+			WriteTimeout:       12 * time.Second,
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("parseConfig() = %v, want %v", got, want)
@@ -101,6 +110,7 @@ func Test_parseConfig(t *testing.T) {
 			"-max_upload_size", "987654",
 			"-file_naming_strategy", "uuid",
 			"-shutdown_timeout", "30000",
+			"-read_timeout", "16s",
 		}
 
 		f, err := os.CreateTemp("", "simple-upload-server-config.*.json")
@@ -118,7 +128,9 @@ func Test_parseConfig(t *testing.T) {
 			"shutdown_timeout": 15000,
 			"enable_auth": true,
 			"read_only_tokens": ["alice", "bob"],
-			"read_write_tokens": ["charlie", "dave"]
+			"read_write_tokens": ["charlie", "dave"],
+			"read_timeout": "32s",
+			"write_timeout": "64s"
 		}`); err != nil {
 			t.Fatalf("failed to write to temp file: %v", err)
 		}
@@ -145,6 +157,8 @@ func Test_parseConfig(t *testing.T) {
 			EnableAuth:         true,
 			ReadOnlyTokens:     []string{"alice", "bob"},
 			ReadWriteTokens:    []string{"charlie", "dave"},
+			ReadTimeout:        16 * time.Second,
+			WriteTimeout:       64 * time.Second,
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("parseConfig() = %v, want %v", got, want)
