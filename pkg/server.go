@@ -313,6 +313,9 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) (int, any) {
 	}
 	log.Printf("GET %s -> %s", r.URL.Path, requestPath)
 	f, err := s.fs.Open(requestPath)
+	if s.EnableCORS {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	if err != nil {
 		// ErrNotExist is a common case so don't log it
 		if errors.Is(err, os.ErrNotExist) {

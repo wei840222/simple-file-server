@@ -25,6 +25,7 @@ func TestGetHandler(t *testing.T) {
 		args args
 		want int
 		body string
+		headers map[string]string
 	}{
 		{
 			name: "get existing file",
@@ -33,6 +34,9 @@ func TestGetHandler(t *testing.T) {
 				Url:    "/files/foo/bar.txt",
 			},
 			want: http.StatusOK,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: "hello, world",
 		},
 		{
@@ -42,6 +46,9 @@ func TestGetHandler(t *testing.T) {
 				Url:    "/files/bar/baz",
 			},
 			want: http.StatusNotFound,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":false,"error":"file not found"}`,
 		},
 		{
@@ -60,6 +67,9 @@ func TestGetHandler(t *testing.T) {
 				Url:    "/files/foo",
 			},
 			want: http.StatusNotFound,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":false,"error":"foo is a directory"}`,
 		},
 	}
@@ -92,6 +102,11 @@ func TestGetHandler(t *testing.T) {
 			}
 			if body := rr.Body.String(); body != tt.body {
 				t.Errorf("body = \"%s\", want = \"%s\"", body, tt.body)
+			}
+			for k, v := range tt.headers {
+				if rr.Header().Get(k) != v {
+					t.Errorf("header %s = %s, want %s", k, rr.Header().Get(k), v)
+				}
 			}
 		})
 	}
