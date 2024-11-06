@@ -21,10 +21,10 @@ func TestGetHandler(t *testing.T) {
 		Url    string
 	}
 	tests := []struct {
-		name string
-		args args
-		want int
-		body string
+		name    string
+		args    args
+		want    int
+		body    string
 		headers map[string]string
 	}{
 		{
@@ -121,10 +121,11 @@ func TestServer_PostHandler(t *testing.T) {
 		Name    string
 	}
 	tests := []struct {
-		name string
-		args args
-		want int
-		body string
+		name    string
+		args    args
+		want    int
+		body    string
+		headers map[string]string
 	}{
 		{
 			name: "Post hello.txt",
@@ -135,6 +136,9 @@ func TestServer_PostHandler(t *testing.T) {
 				Name:    "hello.txt",
 			},
 			want: http.StatusCreated,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":true,"path":"/files/hello.txt"}`,
 		},
 		{
@@ -146,6 +150,9 @@ func TestServer_PostHandler(t *testing.T) {
 				Name:    "empty",
 			},
 			want: http.StatusCreated,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":true,"path":"/files/empty"}`,
 		},
 		{
@@ -256,6 +263,11 @@ func TestServer_PostHandler(t *testing.T) {
 					t.Errorf("failed to verify. request body = %v, local file = %v", tt.args.Content, uploaded)
 				}
 			}
+			for k, v := range tt.headers {
+				if rr.Header().Get(k) != v {
+					t.Errorf("header %s = %s, want %s", k, rr.Header().Get(k), v)
+				}
+			}
 		})
 	}
 }
@@ -269,10 +281,11 @@ func TestServer_PutHandler(t *testing.T) {
 		Name    string
 	}
 	tests := []struct {
-		name string
-		args args
-		want int
-		body string
+		name    string
+		args    args
+		want    int
+		body    string
+		headers map[string]string
 	}{
 		{
 			name: "PUT /files/hello.txt with text",
@@ -283,6 +296,9 @@ func TestServer_PutHandler(t *testing.T) {
 				Name:    "hello.txt",
 			},
 			want: http.StatusCreated,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":true,"path":"/files/hello.txt"}`,
 		},
 		{
@@ -294,6 +310,9 @@ func TestServer_PutHandler(t *testing.T) {
 				Name:    "empty",
 			},
 			want: http.StatusCreated,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":true,"path":"/files/empty"}`,
 		},
 		{
@@ -305,6 +324,9 @@ func TestServer_PutHandler(t *testing.T) {
 				Name:    "world.txt",
 			},
 			want: http.StatusCreated,
+			headers: map[string]string{
+				"Access-Control-Allow-Origin": "*",
+			},
 			body: `{"ok":true,"path":"/files/hello/world.txt"}`,
 		},
 		{
@@ -399,6 +421,11 @@ func TestServer_PutHandler(t *testing.T) {
 				}
 				if !reflect.DeepEqual(uploaded, tt.args.Content) {
 					t.Errorf("failed to verify. request body = %v, local file = %v", tt.args.Content, uploaded)
+				}
+			}
+			for k, v := range tt.headers {
+				if rr.Header().Get(k) != v {
+					t.Errorf("header %s = %s, want %s", k, rr.Header().Get(k), v)
 				}
 			}
 		})
