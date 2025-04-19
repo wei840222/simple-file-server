@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -230,7 +230,7 @@ func generateToken() (string, error) {
 	if _, err := rand.Read(randBytes); err != nil {
 		return "", err
 	}
-	b := crypto.SHA256.New().Sum(randBytes)
+	b := sha256.Sum256(randBytes)
 	return fmt.Sprintf("%x", b), nil
 }
 
