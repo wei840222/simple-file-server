@@ -1,6 +1,6 @@
-# go-simple-upload-server
+# simple-file-server
 
-Simple HTTP server to save artifacts
+Simple HTTP server to save files
 
 - [Usage](#usage)
 - [Authentication](#authentication)

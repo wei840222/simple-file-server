@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	simpleuploadserver "github.com/wei840222/files/pkg"
+	simpleuploadserver "github.com/wei840222/simple-file-server/pkg"
 )
 
 func Test_parseConfig(t *testing.T) {

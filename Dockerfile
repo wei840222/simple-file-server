@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -v -o files-server
+RUN go build -v -o simple-file-server
 
 FROM debian:bookworm-slim
 
@@ -16,8 +16,8 @@ RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-ARG user=files-server
-ARG group=files-server
+ARG user=simple-file-server
+ARG group=simple-file-server
 ARG uid=10000
 ARG gid=10001
 
@@ -28,8 +28,8 @@ RUN groupadd -g ${gid} ${group} \
 
 USER ${user}
 
-COPY --from=builder --chown=${uid}:${gid} /src/files-server /usr/bin/files-server
-# COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/files-server/config.yaml
+COPY --from=builder --chown=${uid}:${gid} /src/simple-file-server /usr/bin/simple-file-server
+# COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/simple-file-server/config.yaml
 
 ENV LOG_COLOR=true
 ENV LOG_LEVEL=info
@@ -38,4 +38,4 @@ ENV GIN_MODE=release
 
 EXPOSE 8080
 
-ENTRYPOINT ["files-server"]
+ENTRYPOINT ["simple-file-server"]

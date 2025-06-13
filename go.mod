@@ -1,4 +1,4 @@
-module github.com/wei840222/files
+module github.com/wei840222/simple-file-server
 
 go 1.24.4
 
