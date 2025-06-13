@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	simpleuploadserver "github.com/mayth/go-simple-upload-server/v2/pkg"
+	simpleuploadserver "github.com/wei840222/files/pkg"
 )
 
 var DefaultConfig = ServerConfig{

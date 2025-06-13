@@ -1,19 +1,41 @@
-ARG ARCH=amd64
-FROM golang:1.21 AS build
+FROM golang:1.24.4-bookworm AS builder
 
-LABEL org.opencontainers.image.authors="Mei Akizuru <chimeaquas@hotmail.com>"
+WORKDIR /src
 
-RUN mkdir -p /go/src/app
-WORKDIR /go/src/app
-
-# resolve dependency before copying whole source code
-COPY go.mod go.sum ./
+COPY go.* ./
 RUN go mod download
 
-# copy other sources & build
-COPY . /go/src/app
-RUN GOOS=linux GOARCH=${ARCH} CGO_ENABLED=0 go build -o /go/bin/app
+COPY . ./
 
-FROM scratch
-COPY --from=build /go/bin/app /usr/local/bin/app
-ENTRYPOINT ["/usr/local/bin/app"]
+RUN go build -v -o files-server
+
+FROM debian:bookworm-slim
+
+# update ca-certificates
+RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG user=files-server
+ARG group=files-server
+ARG uid=10000
+ARG gid=10001
+
+# If you bind mount a volume from the host or a data container,
+# ensure you use the same uid
+RUN groupadd -g ${gid} ${group} \
+    && useradd -l -u ${uid} -g ${gid} -m -s /bin/bash ${user}
+
+USER ${user}
+
+COPY --from=builder --chown=${uid}:${gid} /src/files-server /usr/bin/files-server
+# COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/files-server/config.yaml
+
+ENV LOG_COLOR=true
+ENV LOG_LEVEL=info
+ENV LOG_FORMAT=console
+ENV GIN_MODE=release
+
+EXPOSE 8080
+
+ENTRYPOINT ["files-server"]

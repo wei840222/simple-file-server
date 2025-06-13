@@ -28,3 +28,10 @@ go.work.sum
 .env
 
 ./tmp
+
+.gitignore
+.dockerignore
+.github
+Dockerfile
+LICENSE
+README.md

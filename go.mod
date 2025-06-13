@@ -1,6 +1,6 @@
-module github.com/mayth/go-simple-upload-server/v2
+module github.com/wei840222/files
 
-go 1.21
+go 1.24.4
 
 require (
 	dario.cat/mergo v1.0.0

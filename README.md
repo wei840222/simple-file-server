@@ -1,5 +1,4 @@
-go-simple-upload-server
-=======================
+# go-simple-upload-server
 
 Simple HTTP server to save artifacts
 
@@ -15,7 +14,6 @@ Simple HTTP server to save artifacts
   - [`HEAD /files/:path`](#head-filespath)
   - [`OPTIONS /files/:path`](#options-filespath)
   - [`OPTIONS /upload`](#options-upload)
-
 
 ## Usage
 
@@ -60,7 +58,7 @@ The server implements a simple authentication mechanism using tokens.
    If authentication is enabled but no tokens provided, the server generates a read-only token and a read-write token on its starting up.
 4. Request with the token. Add Authorization header with value `Bearer <TOKEN>` or `token=<TOKEN>` to the query parameter. Authorization header takes precedence.
 
-| Token Type |             Allowed Operations             |
+| Token Type | Allowed Operations                         |
 | ---------- | ------------------------------------------ |
 | read-only  | `GET`, `HEAD`                              |
 | read-write | `POST`, `PUT` in addition to read-only ops |
@@ -69,9 +67,9 @@ Note that `OPTIONS` is always allowed without authentication.
 
 Authentication is failed when:
 
-* A request has no tokens.
-* A request has a token but not registered to the server.
-* A request has a token but not allowed to the requested operation.
+- A request has no tokens.
+- A request has a token but not registered to the server.
+- A request has a token but not allowed to the requested operation.
 
 In these cases, the server respond with `401 Unauthorized` with body like as: `{"ok": false, "error": "unauthorized"}`.
 
@@ -101,8 +99,8 @@ This timeout is not set by default. Before v2.1.0, this is set to 15 seconds.
 
 Please consider changing these timeout if:
 
-* the server or the clients are in a low-bandwidth network.
-* you are working with large files.
+- the server or the clients are in a low-bandwidth network.
+- you are working with large files.
 
 Note that a longer timeout will result in more connections being maintained.
 
@@ -143,7 +141,7 @@ Content-Type
 
 Parameters:
 
-|    Name     | Required? |   Type    |                         Description                          | Default |
+| Name        | Required? | Type      | Description                                                  | Default |
 | ----------- | :-------: | --------- | ------------------------------------------------------------ | ------- |
 | `file`      |     x     | Form Data | A content of the file.                                       |         |
 | `overwrite` |           | `boolean` | Allow overwriting the existing file on the server if `true`. | `false` |
@@ -160,14 +158,14 @@ Content-Type
 
 Body:
 
-|  Name  |   Type    |               Description               |
+| Name   | Type      | Description                             |
 | ------ | --------- | --------------------------------------- |
 | `ok`   | `boolean` | `true` if successful.                   |
 | `path` | `string`  | A path to access this file in this API. |
 
 ##### On Failure
 
-|   StatusCode   |                                              When                                              |
+| StatusCode     | When                                                                                           |
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | `409 Conflict` | There is the file whose name is the same as the uploading file and overwriting is not allowed. |
 
@@ -175,7 +173,7 @@ Body:
 
 ```
 $ echo 'Hello, world!' > sample.txt
-$ curl -Ffile=@sample.txt http://localhost:25478/upload
+$ curl -Ffile=@sample.txt http://localhost:8080/upload
 {"ok":true,"path":"/files/sample.txt"}
 ```
 
@@ -190,7 +188,7 @@ Uploads a file. The original file name is ignored and the name is taken from the
 
 #### Parameters
 
-|    Name     | Required? |   Type    |                    Description                     | Default |
+| Name        | Required? | Type      | Description                                        | Default |
 | ----------- | :-------: | --------- | -------------------------------------------------- | ------- |
 | `:path`     |     x     | `string`  | Path to the file.                                  |         |
 | `file`      |     x     | Form Data | A content of the file.                             |         |
@@ -208,21 +206,21 @@ Content-Type
 
 Body:
 
-|  Name  |   Type    |               Description               |
+| Name   | Type      | Description                             |
 | ------ | --------- | --------------------------------------- |
 | `ok`   | `boolean` | `true` if successful.                   |
 | `path` | `string`  | A path to access this file in this API. |
 
 ##### On Failure
 
-|   StatusCode   |                                              When                                              |
+| StatusCode     | When                                                                                           |
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | `409 Conflict` | There is the file whose name is the same as the uploading file and overwriting is not allowed. |
 
 #### Example
 
 ```
-$ curl -XPUT -Ffile=@sample.txt "http://localhost:25478/files/foobar.txt"
+$ curl -XPUT -Ffile=@sample.txt "http://localhost:8080/files/foobar.txt"
 {"ok":true,"path":"/files/foobar.txt"}
 
 $ cat $DOCROOT/foobar.txt
@@ -237,7 +235,7 @@ Downloads a file.
 
 Parameters:
 
-|  Name  | Required? |   Type   |     Description     | Default |
+| Name   | Required? | Type     | Description         | Default |
 | ------ | :-------: | -------- | ------------------- | ------- |
 | `path` |     x     | `string` | A path to the file. |         |
 
@@ -259,14 +257,14 @@ Body
 Content-Type
 : `application/json`
 
-|   StatusCode    |          When          |
+| StatusCode      | When                   |
 | --------------- | ---------------------- |
 | `404 Not Found` | There is no such file. |
 
 #### Example
 
 ```
-$ curl http://localhost:25478/files/sample.txt
+$ curl http://localhost:8080/files/sample.txt
 Hello, world!
 ```
 
@@ -278,7 +276,7 @@ Check existence of a file.
 
 Parameters:
 
-|  Name  | Required? |   Type   |     Description     | Default |
+| Name   | Required? | Type     | Description         | Default |
 | ------ | :-------: | -------- | ------------------- | ------- |
 | `path` |     x     | `string` | A path to the file. |         |
 
@@ -294,17 +292,18 @@ Body
 
 ##### On Failure
 
-|   StatusCode   |                                              When                                              |
-| -------------- | ---------------------------------------------------------------------------------------------- |
+| StatusCode      | When                        |
+| --------------- | --------------------------- |
 | `404 Not Found` | No such file on the server. |
 
 #### Example
 
 ```
-$ curl -I http://localhost:25478/files/foobar.txt
+$ curl -I http://localhost:8080/files/foobar.txt
 ```
 
 ### `OPTIONS /files/:path`
+
 ### `OPTIONS /upload`
 
 CORS preflight request.
@@ -313,7 +312,7 @@ CORS preflight request.
 
 Parameters:
 
-|  Name  | Required? |   Type   |     Description     | Default |
+| Name   | Required? | Type     | Description         | Default |
 | ------ | :-------: | -------- | ------------------- | ------- |
 | `path` |     x     | `string` | A path to the file. |         |
 
@@ -332,6 +331,6 @@ TODO
 
 #### Notes
 
-* Requests using `*` as a path, like as `OPTIONS * HTTP/1.1`, are not supported.
-* On sending `OPTIONS` request, `token` parameter is not required.
-* For `/files/:path` request, server replies "204 No Content" even if the specified file does not exist.
+- Requests using `*` as a path, like as `OPTIONS * HTTP/1.1`, are not supported.
+- On sending `OPTIONS` request, `token` parameter is not required.
+- For `/files/:path` request, server replies "204 No Content" even if the specified file does not exist.
