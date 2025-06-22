@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,11 +16,15 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
+	"github.com/spf13/viper"
+	"go.uber.org/fx"
+
+	"github.com/wei840222/simple-file-server/config"
 )
 
 type Server struct {
-	ServerConfig
 	fs afero.Fs
 }
 
@@ -35,47 +37,16 @@ var (
 	ErrFileSizeLimitExceeded = fmt.Errorf("file size limit exceeded")
 )
 
-var (
-	DefaultAddr = "127.0.0.1:8080"
-)
-
-// ServerConfig is a configuration for Server.
-type ServerConfig struct {
-	// Address where the server listens on.
-	Addr string `json:"addr"`
-	// Path to the document root.
-	DocumentRoot string `json:"document_root"`
-	// Determines whether to enable CORS header.
-	EnableCORS bool `json:"enable_cors"`
-	// Maximum upload size in bytes.
-	MaxUploadSize int64 `json:"max_upload_size"`
-	// File naming strategy.
-	FileNamingStrategy string `json:"file_naming_strategy"`
-	// Graceful shutdown timeout in milliseconds.
-	ShutdownTimeout int `json:"shutdown_timeout"`
-	// Enable authentication.
-	EnableAuth bool `json:"enable_auth"`
-	// Authentication tokens for read-only access.
-	ReadOnlyTokens []string `json:"read_only_tokens"`
-	// Authentication tokens for read-write access.
-	ReadWriteTokens []string `json:"read_write_tokens"`
-	// ReadTimeout is the maximum duration (in seconds) for reading the entire request, including the body. Zero or negative value means no timeout.
-	ReadTimeout time.Duration `json:"read_timeout"`
-	// WriteTimeout is the maximum duration (in seconds) for writing the response. Zero or negative value means no timeout.
-	WriteTimeout time.Duration `json:"write_timeout"`
-}
-
 // NewServer creates a new Server.
-func NewServer(config ServerConfig) *Server {
+func NewServer() *Server {
 	return &Server{
-		config,
-		afero.NewBasePathFs(afero.NewOsFs(), config.DocumentRoot),
+		afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
 	}
 }
 
 // Start starts listening on `addr`. This function blocks until the server is stopped.
 // Optionally you can pass a channel to `ready` to be notified when the server is ready to accept connections. You can pass nil if you don't need it.
-func (s *Server) Start(ctx context.Context, ready chan struct{}) error {
+func Start(lc fx.Lifecycle, s *Server) {
 	r := mux.NewRouter()
 	r.HandleFunc("/upload", s.handle(s.handlePost)).Methods(http.MethodPost)
 	r.HandleFunc("/upload", s.handle(s.handleOptions)).Methods(http.MethodOptions)
@@ -85,47 +56,37 @@ func (s *Server) Start(ctx context.Context, ready chan struct{}) error {
 	r.PathPrefix("/files").Methods(http.MethodOptions).HandlerFunc(s.handle(s.handleOptions))
 	r.NotFoundHandler = http.HandlerFunc(handleNotFound)
 	r.MethodNotAllowedHandler = http.HandlerFunc(handleMethodNotAllowed)
-	if s.EnableAuth {
+	if viper.GetBool(config.KeyHTTPEnableAuth) {
 		r.Use(s.authenticationMiddleware)
 	}
 	r.Use(logAccess)
 
-	addr := s.Addr
-	if addr == "" {
-		addr = DefaultAddr
-	}
-	log.Printf("Start listening on %s", addr)
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("unable to listen on %s: %v", addr, err)
-	}
-	if ready != nil {
-		close(ready)
-	}
-
+	addr := fmt.Sprintf("%s:%d", viper.GetString(config.KeyHTTPHost), viper.GetInt(config.KeyHTTPPort))
 	srv := &http.Server{
 		Addr:         addr,
-		WriteTimeout: s.WriteTimeout,
-		ReadTimeout:  s.ReadTimeout,
+		WriteTimeout: viper.GetDuration(config.KeyHTTPWriteTimeout),
+		ReadTimeout:  viper.GetDuration(config.KeyHTTPReadTimeout),
 		IdleTimeout:  60 * time.Second,
 		Handler:      r,
 	}
 
-	ret := make(chan error, 1)
-	go func() {
-		log.Printf("Start serving on %s", addr)
-		ret <- srv.Serve(l)
-	}()
-
-	<-ctx.Done()
-	log.Printf("Shutting down... wait up to %d ms", s.ShutdownTimeout)
-	sctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.ShutdownTimeout)*time.Millisecond)
-	defer cancel()
-	if err := srv.Shutdown(sctx); err != nil {
-		log.Printf("failed to shutdown gracefully: %v", err)
-	}
-	err = <-ret
-	return err
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Info().Msgf("Start serving on %s", addr)
+			go func() {
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					panic(err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			log.Info().Msgf("Shutting down... wait up to %v", viper.GetDuration(config.KeyHTTPShutdownTimeout))
+			sctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration(config.KeyHTTPShutdownTimeout))
+			defer cancel()
+			return srv.Shutdown(sctx)
+		},
+	})
 }
 
 func logAccess(next http.Handler) http.Handler {
@@ -141,7 +102,7 @@ func logAccess(next http.Handler) http.Handler {
 			fmt.Sprintf("\"%s\"", r.Referer()),
 			fmt.Sprintf("\"%s\"", r.UserAgent()),
 		}
-		log.Println(strings.Join(vs, " "))
+		log.Info().Msg(strings.Join(vs, " "))
 		next.ServeHTTP(w, r)
 	})
 }
@@ -208,7 +169,7 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) (int, any) {
 	if err != nil {
 		return status, err
 	}
-	if s.EnableCORS {
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	return http.StatusCreated, SuccessfullyUploadedResult{true, destPath}
@@ -226,7 +187,7 @@ func (s *Server) handlePut(w http.ResponseWriter, r *http.Request) (int, any) {
 		return status, err
 	}
 
-	if s.EnableCORS {
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	return http.StatusCreated, SuccessfullyUploadedResult{true, destPath}
@@ -243,7 +204,7 @@ func (s *Server) processUpload(w http.ResponseWriter, r *http.Request, path stri
 		log.Printf("failed to obtain form file: %v", err)
 		return http.StatusInternalServerError, "", fmt.Errorf("cannot obtain the uploaded content")
 	}
-	src := http.MaxBytesReader(w, srcFile, s.MaxUploadSize)
+	src := http.MaxBytesReader(w, srcFile, viper.GetInt64(config.KeyHTTPMaxUploadSize))
 	// MaxBytesReader closes the underlying io.Reader on its Close() is called
 	defer src.Close()
 
@@ -251,7 +212,7 @@ func (s *Server) processUpload(w http.ResponseWriter, r *http.Request, path stri
 	if path == "" {
 		filename := info.Filename
 		if filename == "" {
-			namer := ResolveFileNamingStrategy(s.FileNamingStrategy)
+			namer := ResolveFileNamingStrategy(viper.GetString(config.KeyFileNamingStrategy))
 			s, err := namer(srcFile, info)
 			if err != nil {
 				log.Printf("cannot generate filename: %v", err)
@@ -300,7 +261,7 @@ func (s *Server) processUpload(w http.ResponseWriter, r *http.Request, path stri
 	destPath = "/files" + destPath
 
 	log.Printf("uploaded by PUT to %s (%d bytes)", path, written)
-	if s.EnableCORS {
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	return http.StatusCreated, destPath, nil
@@ -313,7 +274,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) (int, any) {
 	}
 	log.Printf("GET %s -> %s", r.URL.Path, requestPath)
 	f, err := s.fs.Open(requestPath)
-	if s.EnableCORS {
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	if err != nil {
@@ -348,7 +309,7 @@ func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) (int, any
 	} else if strings.HasPrefix(r.URL.Path, "/files") {
 		allowedMethods = []string{http.MethodGet, http.MethodPut, http.MethodHead}
 	}
-	if s.EnableCORS {
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
@@ -375,9 +336,9 @@ func (s *Server) authenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		var allowedTokens []string
-		allowedTokens = append(allowedTokens, s.ReadWriteTokens...)
+		allowedTokens = append(allowedTokens, viper.GetStringSlice(config.KeyHTTPReadWriteTokens)...)
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
-			allowedTokens = append(allowedTokens, s.ReadOnlyTokens...)
+			allowedTokens = append(allowedTokens, viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)...)
 		}
 		if !slices.Contains(allowedTokens, token) {
 			log.Printf("invalid token")

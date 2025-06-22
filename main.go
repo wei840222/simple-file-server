@@ -1,289 +1,102 @@
 package main
 
 import (
-	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/json"
-	"flag"
 	"fmt"
-	"log"
 	"os"
-	"os/signal"
-	"strconv"
 	"strings"
 	"time"
 
-	"dario.cat/mergo"
+	"github.com/ipfans/fxlogger"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	_ "go.uber.org/automaxprocs"
+	"go.uber.org/fx"
+
+	"github.com/wei840222/simple-file-server/config"
 	simpleuploadserver "github.com/wei840222/simple-file-server/pkg"
 )
 
-var DefaultConfig = ServerConfig{
-	DocumentRoot:       ".",
-	Addr:               simpleuploadserver.DefaultAddr,
-	EnableCORS:         nil,
-	MaxUploadSize:      1024 * 1024,
-	FileNamingStrategy: "uuid",
-	ShutdownTimeout:    15000,
-	EnableAuth:         nil,
-	ReadOnlyTokens:     []string{},
-	ReadWriteTokens:    []string{},
-	ReadTimeout:        Duration(15 * time.Second),
-	WriteTimeout:       0,
-}
+var (
+	flagReplacer = strings.NewReplacer(".", "-")
+)
 
-func BoolPointer(v bool) *bool {
-	return &v
-}
-
-type triBool struct {
-	value bool
-	isSet bool
-}
-
-type boolOptFlag triBool
-
-func (f *boolOptFlag) Set(value string) error {
-	v, err := strconv.ParseBool(value)
-	if err != nil {
-		return err
-	}
-	f.value = v
-	f.isSet = true
-	return nil
-}
-
-func (f boolOptFlag) String() string {
-	return strconv.FormatBool(f.value)
-}
-
-func (f boolOptFlag) IsBoolFlag() bool {
-	return true
-}
-
-func (f boolOptFlag) IsSet() bool {
-	return f.isSet
-}
-
-func (f boolOptFlag) Get() any {
-	return f.value
-}
-
-type stringArrayFlag []string
-
-func (f *stringArrayFlag) Set(value string) error {
-	ss := strings.Split(value, ",")
-	*f = ss
-	return nil
-}
-
-func (f stringArrayFlag) String() string {
-	return strings.Join(f, ",")
-}
-
-type Duration time.Duration
-
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(d).Seconds())
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	switch t := v.(type) {
-	case float64:
-		*d = Duration(time.Duration(t) * time.Second)
-	case string:
-		dur, err := time.ParseDuration(t)
-		if err != nil {
+var rootCmd = &cobra.Command{
+	Use:   config.AppName,
+	Short: "Simple HTTP server to save files.",
+	Long:  "Simple HTTP server to save files. With auth support.",
+	PreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := config.InitViper(); err != nil {
 			return err
 		}
-		*d = Duration(dur)
-	default:
-		return fmt.Errorf("invalid duration type: %T", t)
-	}
-	return nil
-}
 
-// ServerConfig wraps simpleuploadserver.ServerConfig to provide JSON marshaling.
-type ServerConfig struct {
-	// Address where the server listens on.
-	Addr string `json:"addr"`
-	// Path to the document root.
-	DocumentRoot string `json:"document_root"`
-	// Determines whether to enable CORS header.
-	EnableCORS *bool `json:"enable_cors"`
-	// Maximum upload size in bytes.
-	MaxUploadSize int64 `json:"max_upload_size"`
-	// File naming strategy.
-	FileNamingStrategy string `json:"file_naming_strategy"`
-	// Graceful shutdown timeout in milliseconds.
-	ShutdownTimeout int `json:"shutdown_timeout"`
-	// Enable authentication.
-	EnableAuth *bool `json:"enable_auth"`
-	// Authentication tokens for read-only access.
-	ReadOnlyTokens []string `json:"read_only_tokens"`
-	// Authentication tokens for read-write access.
-	ReadWriteTokens []string `json:"read_write_tokens"`
-	// ReadTimeout is the maximum duration for reading the entire request, including the body. Zero or negative value means no timeout.
-	ReadTimeout Duration `json:"read_timeout"`
-	// WriteTimeout is the maximum duration for writing the response. Zero or negative value means no timeout.
-	WriteTimeout Duration `json:"write_timeout"`
-}
+		for _, key := range config.AllKeys {
+			viper.BindPFlag(key, cmd.Flags().Lookup(flagReplacer.Replace(key)))
+		}
 
-func (c *ServerConfig) AsConfig() simpleuploadserver.ServerConfig {
-	if c.EnableCORS == nil {
-		c.EnableCORS = BoolPointer(true)
-	}
-	if c.EnableAuth == nil {
-		c.EnableAuth = BoolPointer(false)
-	}
+		config.InitZerolog()
 
-	return simpleuploadserver.ServerConfig{
-		Addr:               c.Addr,
-		DocumentRoot:       c.DocumentRoot,
-		EnableCORS:         *c.EnableCORS,
-		MaxUploadSize:      c.MaxUploadSize,
-		FileNamingStrategy: c.FileNamingStrategy,
-		ShutdownTimeout:    c.ShutdownTimeout,
-		EnableAuth:         *c.EnableAuth,
-		ReadOnlyTokens:     c.ReadOnlyTokens,
-		ReadWriteTokens:    c.ReadWriteTokens,
-		ReadTimeout:        time.Duration(c.ReadTimeout),
-		WriteTimeout:       time.Duration(c.WriteTimeout),
-	}
+		if viper.GetBool(config.KeyHTTPEnableAuth) && len(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)) == 0 && len(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)) == 0 {
+			log.Info().Msg("authentication is enabled but no tokens provided. generating random tokens")
+			readOnlyToken, err := generateToken()
+			if err != nil {
+				return err
+			}
+			readWriteToken, err := generateToken()
+			if err != nil {
+				return err
+			}
+			viper.Set(config.KeyHTTPReadOnlyTokens, readOnlyToken)
+			viper.Set(config.KeyHTTPReadWriteTokens, readWriteToken)
+			log.Info().Msgf("generated read only token: %s", readOnlyToken)
+			log.Info().Msgf("generated read write token: %s", readWriteToken)
+		}
+
+		log.Debug().Any("config", viper.AllSettings()).Msg("config loaded")
+
+		return nil
+	},
+	Run: func(*cobra.Command, []string) {
+		app := fx.New(
+			fx.Provide(
+				simpleuploadserver.NewServer,
+			),
+			fx.Invoke(
+				simpleuploadserver.Start,
+			),
+			fx.WithLogger(fxlogger.WithZerolog(log.Logger)),
+		)
+
+		app.Run()
+	},
 }
 
 func main() {
-	NewApp(os.Args[0]).Run(os.Args[1:])
-}
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyLogLevel), "debug", "Log level")
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyLogFormat), "console", "Log format")
+	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyLogColor), true, "Log color")
 
-type app struct {
-	flagSet            *flag.FlagSet
-	configFilePath     string
-	documentRoot       string
-	addr               string
-	enableCORS         boolOptFlag
-	maxUploadSize      int64
-	fileNamingStrategy string
-	shutdownTimeout    int
-	enableAuth         boolOptFlag
-	readOnlyTokens     stringArrayFlag
-	readWriteTokens    stringArrayFlag
-	readTimeout        time.Duration
-	writeTimeout       time.Duration
-}
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyO11yHost), "0.0.0.0", "Observability server host")
+	rootCmd.PersistentFlags().Int(flagReplacer.Replace(config.KeyO11yPort), 9090, "Observability server port")
 
-func NewApp(name string) *app {
-	a := &app{}
-	fs := flag.NewFlagSet(name, flag.ExitOnError)
-	fs.StringVar(&a.configFilePath, "config", "", "path to config file")
-	fs.StringVar(&a.documentRoot, "document_root", "", "path to document root directory")
-	fs.StringVar(&a.addr, "addr", "", "address to listen")
-	fs.Var(&a.enableCORS, "enable_cors", "enable CORS header")
-	fs.Int64Var(&a.maxUploadSize, "max_upload_size", 0, "max upload size in bytes")
-	fs.StringVar(&a.fileNamingStrategy, "file_naming_strategy", "", "File naming strategy")
-	fs.IntVar(&a.shutdownTimeout, "shutdown_timeout", 0, "graceful shutdown timeout in milliseconds")
-	fs.Var(&a.enableAuth, "enable_auth", "enable authentication")
-	fs.Var(&a.readOnlyTokens, "read_only_tokens", "comma separated list of read only tokens")
-	fs.Var(&a.readWriteTokens, "read_write_tokens", "comma separated list of read write tokens")
-	fs.DurationVar(&a.readTimeout, "read_timeout", 0, "read timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms'). If no suffix is provided, it is interpreted as seconds.")
-	fs.DurationVar(&a.writeTimeout, "write_timeout", 0, "write timeout. zero or negative value means no timeout. same format as read_timeout.")
-	a.flagSet = fs
-	return a
-}
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyGinMode), "debug", "Gin mode")
 
-func (a *app) Run(args []string) {
-	config, err := a.ParseConfig(args)
-	if err != nil {
-		log.Fatalf("failed to parse config: %v", err)
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyHTTPHost), "0.0.0.0", "HTTP server host")
+	rootCmd.PersistentFlags().Int(flagReplacer.Replace(config.KeyHTTPPort), 8080, "HTTP server port")
+	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyHTTPEnableCORS), true, "Enable CORS header")
+	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyHTTPEnableAuth), false, "Enable authentication")
+	rootCmd.PersistentFlags().StringSlice(flagReplacer.Replace(config.KeyHTTPReadOnlyTokens), []string{}, "Comma separated list of read only tokens")
+	rootCmd.PersistentFlags().StringSlice(flagReplacer.Replace(config.KeyHTTPReadWriteTokens), []string{}, "Comma separated list of read write tokens")
+	rootCmd.PersistentFlags().Int64(flagReplacer.Replace(config.KeyHTTPMaxUploadSize), 5242880, "Maximum upload size in bytes")
+	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPReadTimeout), 15*time.Second, "Read timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPWriteTimeout), 300*time.Second, "Write timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
+
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyFileRoot), ".", "File path to document root directory")
+	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyFileNamingStrategy), "uuid", "File naming strategy")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	log.Printf("configured: %+v", config)
-
-	if config.EnableAuth && len(config.ReadOnlyTokens) == 0 && len(config.ReadWriteTokens) == 0 {
-		log.Print("[NOTICE] Authentication is enabled but no tokens provided. generating random tokens")
-		readOnlyToken, err := generateToken()
-		if err != nil {
-			log.Fatalf("failed to generate read only token: %v", err)
-		}
-		readWriteToken, err := generateToken()
-		if err != nil {
-			log.Fatalf("failed to generate read write token: %v", err)
-		}
-		config.ReadOnlyTokens = append(config.ReadOnlyTokens, readOnlyToken)
-		config.ReadWriteTokens = append(config.ReadWriteTokens, readWriteToken)
-		log.Printf("generated read only token: %s", readOnlyToken)
-		log.Printf("generated read write token: %s", readWriteToken)
-	}
-
-	s := simpleuploadserver.NewServer(*config)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-	err = s.Start(ctx, nil)
-	log.Printf("server stopped: %v", err)
-}
-
-func generateToken() (string, error) {
-	randBytes := make([]byte, 32)
-	if _, err := rand.Read(randBytes); err != nil {
-		return "", err
-	}
-	b := sha256.Sum256(randBytes)
-	return fmt.Sprintf("%x", b), nil
-}
-
-// parseConfig parses the configuration from the `src` and merges it with the `orig` configuration.
-func (a *app) ParseConfig(args []string) (*simpleuploadserver.ServerConfig, error) {
-	if err := a.flagSet.Parse(args); err != nil {
-		return nil, err
-	}
-
-	config := DefaultConfig
-
-	if a.configFilePath != "" {
-		f, err := os.Open(a.configFilePath)
-		if err != nil {
-			log.Fatalf("failed to open config file: %v", err)
-		}
-		defer f.Close()
-		fileConfig := ServerConfig{}
-		if err := json.NewDecoder(f).Decode(&fileConfig); err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-		log.Printf("loaded config from source file: %+v", fileConfig)
-		if err := mergo.Merge(&config, fileConfig, mergo.WithOverride); err != nil {
-			return nil, fmt.Errorf("failed to merge config from file: %w", err)
-		}
-		log.Printf("merged file config: %+v", config)
-	} else {
-		log.Print("no config file provided")
-	}
-
-	configFromFlags := ServerConfig{
-		DocumentRoot:       a.documentRoot,
-		Addr:               a.addr,
-		MaxUploadSize:      a.maxUploadSize,
-		FileNamingStrategy: a.fileNamingStrategy,
-		ShutdownTimeout:    a.shutdownTimeout,
-		ReadOnlyTokens:     a.readOnlyTokens,
-		ReadWriteTokens:    a.readWriteTokens,
-		ReadTimeout:        Duration(a.readTimeout),
-		WriteTimeout:       Duration(a.writeTimeout),
-	}
-	if a.enableCORS.IsSet() {
-		configFromFlags.EnableCORS = &a.enableCORS.value
-	}
-	if a.enableAuth.IsSet() {
-		configFromFlags.EnableAuth = &a.enableAuth.value
-	}
-	log.Printf("config from flag: %+v", configFromFlags)
-	if err := mergo.Merge(&config, configFromFlags, mergo.WithOverride); err != nil {
-		return nil, fmt.Errorf("failed to merge config from flags: %w", err)
-	}
-	log.Printf("merged flag config: %+v", config)
-
-	v := config.AsConfig()
-	return &v, nil
 }

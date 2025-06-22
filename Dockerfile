@@ -29,7 +29,7 @@ RUN groupadd -g ${gid} ${group} \
 USER ${user}
 
 COPY --from=builder --chown=${uid}:${gid} /src/simple-file-server /usr/bin/simple-file-server
-# COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/simple-file-server/config.yaml
+COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/simple-file-server/config.yaml
 
 ENV LOG_COLOR=true
 ENV LOG_LEVEL=info
