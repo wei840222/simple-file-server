@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ipfans/fxlogger"
@@ -17,10 +16,6 @@ import (
 	simpleuploadserver "github.com/wei840222/simple-file-server/pkg"
 )
 
-var (
-	flagReplacer = strings.NewReplacer(".", "-")
-)
-
 var rootCmd = &cobra.Command{
 	Use:   config.AppName,
 	Short: "Simple HTTP server to save files.",
@@ -30,10 +25,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		for _, key := range config.AllKeys {
-			viper.BindPFlag(key, cmd.Flags().Lookup(flagReplacer.Replace(key)))
-		}
-
+		config.InitCobraPFlag(cmd)
 		config.InitZerolog()
 
 		if viper.GetBool(config.KeyHTTPEnableAuth) && len(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)) == 0 && len(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)) == 0 {
@@ -52,7 +44,7 @@ var rootCmd = &cobra.Command{
 			log.Info().Msgf("generated read write token: %s", readWriteToken)
 		}
 
-		log.Debug().Any("config", viper.AllSettings()).Msg("config loaded")
+		log.Info().Any("config", viper.AllSettings()).Msg("config loaded")
 
 		return nil
 	},
@@ -60,8 +52,11 @@ var rootCmd = &cobra.Command{
 		app := fx.New(
 			fx.Provide(
 				simpleuploadserver.NewServer,
+				NewTracerProvider,
+				NewGinEngine,
 			),
 			fx.Invoke(
+				RunO11yHTTPServer,
 				simpleuploadserver.Start,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.Logger)),
@@ -72,28 +67,29 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyLogLevel), "debug", "Log level")
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyLogFormat), "console", "Log format")
-	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyLogColor), true, "Log color")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyLogLevel), "debug", "Log level")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyLogFormat), "console", "Log format")
+	rootCmd.PersistentFlags().Bool(config.FlagReplacer.Replace(config.KeyLogColor), true, "Log color")
 
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyO11yHost), "0.0.0.0", "Observability server host")
-	rootCmd.PersistentFlags().Int(flagReplacer.Replace(config.KeyO11yPort), 9090, "Observability server port")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyO11yHost), "0.0.0.0", "Observability server host")
+	rootCmd.PersistentFlags().Int(config.FlagReplacer.Replace(config.KeyO11yPort), 9090, "Observability server port")
 
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyGinMode), "debug", "Gin mode")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyGinMode), "debug", "Gin mode")
 
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyHTTPHost), "0.0.0.0", "HTTP server host")
-	rootCmd.PersistentFlags().Int(flagReplacer.Replace(config.KeyHTTPPort), 8080, "HTTP server port")
-	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyHTTPEnableCORS), true, "Enable CORS header")
-	rootCmd.PersistentFlags().Bool(flagReplacer.Replace(config.KeyHTTPEnableAuth), false, "Enable authentication")
-	rootCmd.PersistentFlags().StringSlice(flagReplacer.Replace(config.KeyHTTPReadOnlyTokens), []string{}, "Comma separated list of read only tokens")
-	rootCmd.PersistentFlags().StringSlice(flagReplacer.Replace(config.KeyHTTPReadWriteTokens), []string{}, "Comma separated list of read write tokens")
-	rootCmd.PersistentFlags().Int64(flagReplacer.Replace(config.KeyHTTPMaxUploadSize), 5242880, "Maximum upload size in bytes")
-	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPReadTimeout), 15*time.Second, "Read timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
-	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPWriteTimeout), 300*time.Second, "Write timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
-	rootCmd.PersistentFlags().Duration(flagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyHTTPHost), "0.0.0.0", "HTTP server host")
+	rootCmd.PersistentFlags().Int(config.FlagReplacer.Replace(config.KeyHTTPPort), 8080, "HTTP server port")
+	rootCmd.PersistentFlags().Bool(config.FlagReplacer.Replace(config.KeyHTTPEnableCORS), false, "Enable CORS header")
+	rootCmd.PersistentFlags().Bool(config.FlagReplacer.Replace(config.KeyHTTPEnableAuth), false, "Enable authentication")
+	rootCmd.PersistentFlags().StringSlice(config.FlagReplacer.Replace(config.KeyHTTPReadOnlyTokens), []string{}, "Comma separated list of read only tokens")
+	rootCmd.PersistentFlags().StringSlice(config.FlagReplacer.Replace(config.KeyHTTPReadWriteTokens), []string{}, "Comma separated list of read write tokens")
+	rootCmd.PersistentFlags().Int64(config.FlagReplacer.Replace(config.KeyHTTPMaxUploadSize), 5242880, "Maximum upload size in bytes")
+	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPReadTimeout), 15*time.Second, "Read timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPWriteTimeout), 300*time.Second, "Write timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPIdleTimeout), 60*time.Second, "Idle timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
+	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyFileRoot), ".", "File path to document root directory")
-	rootCmd.PersistentFlags().String(flagReplacer.Replace(config.KeyFileNamingStrategy), "uuid", "File naming strategy")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), ".", "File path to document root directory")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileNamingStrategy), "uuid", "File naming strategy")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

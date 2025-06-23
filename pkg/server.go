@@ -66,7 +66,7 @@ func Start(lc fx.Lifecycle, s *Server) {
 		Addr:         addr,
 		WriteTimeout: viper.GetDuration(config.KeyHTTPWriteTimeout),
 		ReadTimeout:  viper.GetDuration(config.KeyHTTPReadTimeout),
-		IdleTimeout:  60 * time.Second,
+		IdleTimeout:  viper.GetDuration(config.KeyHTTPIdleTimeout),
 		Handler:      r,
 	}
 

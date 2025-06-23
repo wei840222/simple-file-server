@@ -22,33 +22,9 @@ const (
 	KeyHTTPMaxUploadSize   = "http.max_upload_size"
 	KeyHTTPReadTimeout     = "http.read_timeout"
 	KeyHTTPWriteTimeout    = "http.write_timeout"
+	KeyHTTPIdleTimeout     = "http.idle_timeout"
 	KeyHTTPShutdownTimeout = "http.shutdown_timeout"
 
 	KeyFileRoot           = "file.root"
 	KeyFileNamingStrategy = "file.naming_strategy"
 )
-
-var AllKeys = []string{
-	KeyLogLevel,
-	KeyLogFormat,
-	KeyLogColor,
-
-	KeyO11yHost,
-	KeyO11yPort,
-
-	KeyGinMode,
-
-	KeyHTTPPort,
-	KeyHTTPHost,
-	KeyHTTPEnableCORS,
-	KeyHTTPEnableAuth,
-	KeyHTTPReadOnlyTokens,
-	KeyHTTPReadWriteTokens,
-	KeyHTTPMaxUploadSize,
-	KeyHTTPReadTimeout,
-	KeyHTTPWriteTimeout,
-	KeyHTTPShutdownTimeout,
-
-	KeyFileRoot,
-	KeyFileNamingStrategy,
-}
