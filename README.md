@@ -28,8 +28,6 @@ Simple HTTP server to save files
         enable authentication
   -enable_cors
         enable CORS header
-  -file_naming_strategy string
-        File naming strategy
   -max_upload_size int
         max upload size in bytes
   -read_only_tokens value

@@ -25,6 +25,5 @@ const (
 	KeyHTTPIdleTimeout     = "http.idle_timeout"
 	KeyHTTPShutdownTimeout = "http.shutdown_timeout"
 
-	KeyFileRoot           = "file.root"
-	KeyFileNamingStrategy = "file.naming_strategy"
+	KeyFileRoot = "file.root"
 )

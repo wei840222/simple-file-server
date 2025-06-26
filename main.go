@@ -13,7 +13,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/wei840222/simple-file-server/config"
-	simpleuploadserver "github.com/wei840222/simple-file-server/pkg"
+	"github.com/wei840222/simple-file-server/handler"
 )
 
 var rootCmd = &cobra.Command{
@@ -51,13 +51,12 @@ var rootCmd = &cobra.Command{
 	Run: func(*cobra.Command, []string) {
 		app := fx.New(
 			fx.Provide(
-				simpleuploadserver.NewServer,
 				NewTracerProvider,
 				NewGinEngine,
 			),
 			fx.Invoke(
 				RunO11yHTTPServer,
-				simpleuploadserver.Start,
+				handler.RegisterFileHandler,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.Logger)),
 		)
@@ -88,8 +87,7 @@ func main() {
 	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPIdleTimeout), 60*time.Second, "Idle timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 
-	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), ".", "File path to document root directory")
-	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileNamingStrategy), "uuid", "File naming strategy")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), "./data", "File path to document root directory")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
