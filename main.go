@@ -57,6 +57,7 @@ var rootCmd = &cobra.Command{
 			fx.Invoke(
 				RunO11yHTTPServer,
 				handler.RegisterFileHandler,
+				handler.RegisterUploadHandler,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.Logger)),
 		)
@@ -87,7 +88,8 @@ func main() {
 	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPIdleTimeout), 60*time.Second, "Idle timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 
-	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), "./data", "File path to document root directory")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), "./data/files", "Path to save uploaded files.")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileDatabase), "./data/sqlite.db", "Path to the SQLite database file. If the file does not exist, it will be created.")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

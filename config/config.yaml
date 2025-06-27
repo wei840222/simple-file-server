@@ -27,4 +27,5 @@
 #   shutdown_timeout: 15s
 
 # file:
-#   root: "."
+#   root: "./data/files"
+#   database: "./data/sqlite.db"

@@ -33,6 +33,7 @@ var (
 		KeyHTTPShutdownTimeout,
 
 		KeyFileRoot,
+		KeyFileDatabase,
 	}
 )
 

@@ -140,15 +140,13 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 
 	if !exists {
 		c.JSON(http.StatusCreated, gin.H{
-			"message": "File created successfully",
-			"path":    path,
+			"message": "file created successfully",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "File overwritten successfully",
-		"path":    path,
+		"message": "file overwritten successfully",
 	})
 }
 
