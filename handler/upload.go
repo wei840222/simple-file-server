@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel/metric"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -125,7 +126,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	})
 }
 
-func RegisterUploadHandler(e *gin.Engine) error {
+func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
 	db, err := gorm.Open(sqlite.Open(viper.GetString(config.KeyFileDatabase)), &gorm.Config{
 		Logger: logger.New(
 			&log.Logger,
@@ -133,7 +134,7 @@ func RegisterUploadHandler(e *gin.Engine) error {
 				SlowThreshold:             time.Second,
 				LogLevel:                  logger.Info,
 				IgnoreRecordNotFoundError: true,
-				ParameterizedQueries:      false,
+				ParameterizedQueries:      true,
 				Colorful:                  false,
 			},
 		),

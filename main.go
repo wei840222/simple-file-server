@@ -51,6 +51,7 @@ var rootCmd = &cobra.Command{
 	Run: func(*cobra.Command, []string) {
 		app := fx.New(
 			fx.Provide(
+				NewMeterProvider,
 				NewTracerProvider,
 				NewGinEngine,
 			),

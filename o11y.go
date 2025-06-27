@@ -12,10 +12,13 @@ import (
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 
@@ -55,6 +58,27 @@ func NewTracerProvider(lc fx.Lifecycle) (trace.TracerProvider, error) {
 	})
 
 	return ptp, nil
+}
+
+func NewMeterProvider(lc fx.Lifecycle) (metric.MeterProvider, error) {
+	exporter, err := prometheus.New()
+	if err != nil {
+		return nil, err
+	}
+
+	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(exporter),
+	)
+
+	otel.SetMeterProvider(provider)
+
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return provider.Shutdown(ctx)
+		},
+	})
+
+	return provider, nil
 }
 
 func RunO11yHTTPServer(lc fx.Lifecycle) {
