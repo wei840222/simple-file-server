@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	FlagReplacer = strings.NewReplacer(".", "-")
+	FlagReplacer = strings.NewReplacer(".", "-", "_", "-")
 
 	AllKeys = []string{
 		KeyLogLevel,

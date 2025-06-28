@@ -13,7 +13,8 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/wei840222/simple-file-server/config"
-	"github.com/wei840222/simple-file-server/handler"
+	"github.com/wei840222/simple-file-server/server"
+	"github.com/wei840222/simple-file-server/server/handler"
 )
 
 var rootCmd = &cobra.Command{
@@ -51,12 +52,12 @@ var rootCmd = &cobra.Command{
 	Run: func(*cobra.Command, []string) {
 		app := fx.New(
 			fx.Provide(
-				NewMeterProvider,
-				NewTracerProvider,
-				NewGinEngine,
+				server.NewMeterProvider,
+				server.NewTracerProvider,
+				server.NewGinEngine,
 			),
 			fx.Invoke(
-				RunO11yHTTPServer,
+				server.RunO11yHTTPServer,
 				handler.RegisterFileHandler,
 				handler.RegisterUploadHandler,
 			),

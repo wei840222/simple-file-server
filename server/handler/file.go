@@ -12,7 +12,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+
 	"github.com/wei840222/simple-file-server/config"
+	"github.com/wei840222/simple-file-server/server"
+	"github.com/wei840222/simple-file-server/server/middleware"
 )
 
 type FileHandler struct {
@@ -24,9 +27,9 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 	log.Debug().Str("path", path).Msg("checking if file exists")
 
 	if path == "" {
-		c.Error(ErrFileNotFound)
-		c.AbortWithStatusJSON(http.StatusNotFound, ErrorRes{
-			Error: ErrFileNotFound.Error(),
+		c.Error(server.ErrFileNotFound)
+		c.AbortWithStatusJSON(http.StatusNotFound, server.ErrorRes{
+			Error: server.ErrFileNotFound.Error(),
 		})
 		return
 	}
@@ -34,9 +37,9 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 	f, err := h.fs.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			c.Error(ErrFileNotFound)
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrorRes{
-				Error: ErrFileNotFound.Error(),
+			c.Error(server.ErrFileNotFound)
+			c.AbortWithStatusJSON(http.StatusNotFound, server.ErrorRes{
+				Error: server.ErrFileNotFound.Error(),
 			})
 			return
 		}
@@ -51,9 +54,9 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 
 	if fi.IsDir() {
 		log.Debug().Str("path", path).Msg("path is a directory")
-		c.Error(ErrFileNotFound)
-		c.AbortWithStatusJSON(http.StatusNotFound, ErrorRes{
-			Error: ErrFileNotFound.Error(),
+		c.Error(server.ErrFileNotFound)
+		c.AbortWithStatusJSON(http.StatusNotFound, server.ErrorRes{
+			Error: server.ErrFileNotFound.Error(),
 		})
 		return
 	}
@@ -66,9 +69,9 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 func (h *FileHandler) UploadContent(c *gin.Context) {
 	path := strings.TrimPrefix(c.Param("path"), "/")
 	if path == "" {
-		c.Error(ErrFilePathInvalid)
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorRes{
-			Error: ErrFilePathInvalid.Error(),
+		c.Error(server.ErrFilePathInvalid)
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
+			Error: server.ErrFilePathInvalid.Error(),
 		})
 		return
 	}
@@ -82,9 +85,9 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 	// If the request method is PUT, we allow overwriting the file.
 	allowOverwrite := c.Request.Method == http.MethodPut
 	if exists && !allowOverwrite {
-		c.Error(ErrFileAlreadyExists)
-		c.AbortWithStatusJSON(http.StatusConflict, ErrorRes{
-			Error: ErrFileAlreadyExists.Error(),
+		c.Error(server.ErrFileAlreadyExists)
+		c.AbortWithStatusJSON(http.StatusConflict, server.ErrorRes{
+			Error: server.ErrFileAlreadyExists.Error(),
 		})
 		return
 	}
@@ -92,7 +95,7 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 	fh, err := c.FormFile("file")
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorRes{
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
 			Error: err.Error(),
 		})
 		return
@@ -101,7 +104,7 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 	f, err := fh.Open()
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorRes{
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
 			Error: err.Error(),
 		})
 		return
@@ -128,9 +131,9 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 	if err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
-			c.Error(ErrFileSizeLimitExceeded)
-			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, ErrorRes{
-				Error: ErrFileSizeLimitExceeded.Error(),
+			c.Error(server.ErrFileSizeLimitExceeded)
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, server.ErrorRes{
+				Error: server.ErrFileSizeLimitExceeded.Error(),
 			})
 			return
 		}
@@ -157,9 +160,9 @@ func RegisterFileHandler(e *gin.Engine) {
 
 	files := e.Group("/files")
 	{
-		files.HEAD("/*path", h.ServeContent)
-		files.GET("/*path", h.ServeContent)
-		files.POST("/*path", h.UploadContent)
-		files.PUT("/*path", h.UploadContent)
+		files.HEAD("/*path", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)), h.ServeContent)
+		files.GET("/*path", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)), h.ServeContent)
+		files.POST("/*path", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)
+		files.PUT("/*path", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)
 	}
 }

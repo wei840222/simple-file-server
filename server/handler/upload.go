@@ -21,6 +21,8 @@ import (
 	"gorm.io/plugin/opentelemetry/tracing"
 
 	"github.com/wei840222/simple-file-server/config"
+	"github.com/wei840222/simple-file-server/server"
+	"github.com/wei840222/simple-file-server/server/middleware"
 )
 
 func generateRandomID(length int) (string, error) {
@@ -60,7 +62,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	fh, err := c.FormFile("file")
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorRes{
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
 			Error: err.Error(),
 		})
 		return
@@ -82,7 +84,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	f, err := fh.Open()
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorRes{
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
 			Error: err.Error(),
 		})
 		return
@@ -110,9 +112,9 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	if err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
-			c.Error(ErrFileSizeLimitExceeded)
-			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, ErrorRes{
-				Error: ErrFileSizeLimitExceeded.Error(),
+			c.Error(server.ErrFileSizeLimitExceeded)
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, server.ErrorRes{
+				Error: server.ErrFileSizeLimitExceeded.Error(),
 			})
 			return
 		}
@@ -154,7 +156,7 @@ func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
 		fs: afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
 	}
 
-	e.POST("/upload", h.UploadContent)
+	e.POST("/upload", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)
 
 	return nil
 }
