@@ -13,6 +13,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/wei840222/simple-file-server/config"
+	"github.com/wei840222/simple-file-server/job"
 	"github.com/wei840222/simple-file-server/server"
 	"github.com/wei840222/simple-file-server/server/handler"
 )
@@ -22,6 +23,8 @@ var rootCmd = &cobra.Command{
 	Short: "Simple HTTP server to save files.",
 	Long:  "Simple HTTP server to save files. With auth support.",
 	PreRunE: func(cmd *cobra.Command, _ []string) error {
+		logger := log.With().Str("logger", "cobra").Logger()
+
 		if err := config.InitViper(); err != nil {
 			return err
 		}
@@ -30,7 +33,7 @@ var rootCmd = &cobra.Command{
 		config.InitZerolog()
 
 		if viper.GetBool(config.KeyHTTPEnableAuth) && len(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)) == 0 && len(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)) == 0 {
-			log.Info().Msg("authentication is enabled but no tokens provided. generating random tokens")
+			logger.Info().Msg("authentication is enabled but no tokens provided. generating random tokens")
 			readOnlyToken, err := generateToken()
 			if err != nil {
 				return err
@@ -41,11 +44,11 @@ var rootCmd = &cobra.Command{
 			}
 			viper.Set(config.KeyHTTPReadOnlyTokens, readOnlyToken)
 			viper.Set(config.KeyHTTPReadWriteTokens, readWriteToken)
-			log.Info().Msgf("generated read only token: %s", readOnlyToken)
-			log.Info().Msgf("generated read write token: %s", readWriteToken)
+			logger.Info().Msgf("generated read only token: %s", readOnlyToken)
+			logger.Info().Msgf("generated read write token: %s", readWriteToken)
 		}
 
-		log.Info().Any("config", viper.AllSettings()).Msg("config loaded")
+		logger.Info().Any("config", viper.AllSettings()).Msg("config loaded")
 
 		return nil
 	},
@@ -55,13 +58,16 @@ var rootCmd = &cobra.Command{
 				server.NewMeterProvider,
 				server.NewTracerProvider,
 				server.NewGinEngine,
+				job.NewCronjob,
 			),
 			fx.Invoke(
 				server.RunO11yHTTPServer,
 				handler.RegisterFileHandler,
 				handler.RegisterUploadHandler,
+				job.RegisterExpireUploadJob,
 			),
-			fx.WithLogger(fxlogger.WithZerolog(log.Logger)),
+			fx.WithLogger(fxlogger.WithZerolog(log.With().Str("logger", "fx").Logger())),
+			fx.StopTimeout(3*viper.GetDuration(config.KeyHTTPShutdownTimeout)),
 		)
 
 		app.Run()

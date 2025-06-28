@@ -159,9 +159,10 @@ Content-Type
 
 Parameters:
 
-| Name   | Required? | Type      | Description            | Default |
-| ------ | :-------: | --------- | ---------------------- | ------- |
-| `file` |     v     | Form Data | A content of the file. |         |
+| Name     | Required? | Type         | Description              | Default |
+| -------- | :-------: | ------------ | ------------------------ | ------- |
+| `file`   |     v     | Form Data    | A content of the file.   |         |
+| `expire` |     x     | Query String | Expire time of the file. | 168h    |
 
 #### Response
 
@@ -191,7 +192,7 @@ Body:
 
 ```bash
 echo 'Hello, world!' > sample.txt
-curl -X POST -F file=@sample.txt http://localhost:8080/upload
+curl -X POST -F file=@sample.txt http://localhost:8080/upload?expire=1h
 ```
 
 ```

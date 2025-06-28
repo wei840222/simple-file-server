@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -19,12 +20,13 @@ import (
 )
 
 type FileHandler struct {
-	fs afero.Fs
+	logger zerolog.Logger
+	fs     afero.Fs
 }
 
 func (h *FileHandler) ServeContent(c *gin.Context) {
 	path := strings.TrimPrefix(c.Param("path"), "/")
-	log.Debug().Str("path", path).Msg("checking if file exists")
+	h.logger.Debug().Str("path", path).Msg("checking if file exists")
 
 	if path == "" {
 		c.Error(server.ErrFileNotFound)
@@ -53,7 +55,7 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 	}
 
 	if fi.IsDir() {
-		log.Debug().Str("path", path).Msg("path is a directory")
+		h.logger.Debug().Str("path", path).Msg("path is a directory")
 		c.Error(server.ErrFileNotFound)
 		c.AbortWithStatusJSON(http.StatusNotFound, server.ErrorRes{
 			Error: server.ErrFileNotFound.Error(),
@@ -139,7 +141,7 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 		}
 		panic(err)
 	}
-	log.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
+	h.logger.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
 
 	if !exists {
 		c.JSON(http.StatusCreated, gin.H{
@@ -154,8 +156,9 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 }
 
 func RegisterFileHandler(e *gin.Engine) {
-	h := &FileHandler{
-		fs: afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
+	h := FileHandler{
+		logger: log.With().Str("logger", "fileHandler").Logger(),
+		fs:     afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
 	}
 
 	files := e.Group("/files")

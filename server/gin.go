@@ -29,6 +29,8 @@ func NewGinLogger(notLogged ...string) gin.HandlerFunc {
 		}
 	}
 
+	logger := log.With().Str("logger", "gin").Logger()
+
 	return func(c *gin.Context) {
 		// other handler can change c.Path so:
 		path := c.Request.URL.Path
@@ -75,14 +77,14 @@ func NewGinLogger(notLogged ...string) gin.HandlerFunc {
 		)
 
 		if len(c.Errors) > 0 {
-			log.Error().Fields(entry).Msg(strings.TrimSpace(c.Errors.ByType(gin.ErrorTypePrivate).String()))
+			logger.Error().Fields(entry).Msg(strings.TrimSpace(c.Errors.ByType(gin.ErrorTypePrivate).String()))
 		}
 		if status >= http.StatusInternalServerError {
-			log.Error().Fields(entry).Msg(msg)
+			logger.Error().Fields(entry).Msg(msg)
 		} else if status >= http.StatusBadRequest {
-			log.Warn().Fields(entry).Msg(msg)
+			logger.Warn().Fields(entry).Msg(msg)
 		} else {
-			log.Info().Fields(entry).Msg(msg)
+			logger.Info().Fields(entry).Msg(msg)
 		}
 	}
 }

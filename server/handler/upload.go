@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel/metric"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
 	"github.com/wei840222/simple-file-server/config"
@@ -48,11 +49,22 @@ type Upload struct {
 }
 
 type UploadHandler struct {
-	db *gorm.DB
-	fs afero.Fs
+	logger zerolog.Logger
+	db     *gorm.DB
+	fs     afero.Fs
 }
 
 func (h *UploadHandler) UploadContent(c *gin.Context) {
+	// Extract the expiration time from the query parameters, defaulting to 168 hours (7 days).
+	expire, err := time.ParseDuration(c.DefaultQuery("expire", "168h"))
+	if err != nil {
+		c.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
+			Error: err.Error(),
+		})
+		return
+	}
+
 	// Generate a random ID for the upload.
 	id, err := generateRandomID(8)
 	if err != nil {
@@ -74,7 +86,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		ID:            id,
 		FileExtension: fileExtension,
 		CreatedAt:     time.Now(),
-		ExpiredAt:     time.Now().Add(7 * 24 * time.Hour),
+		ExpiredAt:     time.Now().Add(expire),
 	}
 
 	if err := h.db.WithContext(c).Create(&upload).Error; err != nil {
@@ -120,7 +132,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		}
 		panic(err)
 	}
-	log.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
+	h.logger.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "file created successfully",
@@ -129,14 +141,16 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 }
 
 func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
+	logger := log.With().Str("logger", "gorm").Logger()
+
 	db, err := gorm.Open(sqlite.Open(viper.GetString(config.KeyFileDatabase)), &gorm.Config{
-		Logger: logger.New(
-			&log.Logger,
-			logger.Config{
+		Logger: gormlogger.New(
+			&logger,
+			gormlogger.Config{
 				SlowThreshold:             time.Second,
-				LogLevel:                  logger.Info,
+				LogLevel:                  gormlogger.Info,
 				IgnoreRecordNotFoundError: true,
-				ParameterizedQueries:      true,
+				ParameterizedQueries:      false,
 				Colorful:                  false,
 			},
 		),
@@ -151,9 +165,10 @@ func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
 		return err
 	}
 
-	h := &UploadHandler{
-		db: db,
-		fs: afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
+	h := UploadHandler{
+		logger: log.With().Str("logger", "uploadHandler").Logger(),
+		db:     db,
+		fs:     afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
 	}
 
 	e.POST("/upload", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)

@@ -10,6 +10,7 @@ require (
 	github.com/ipfans/fxlogger v0.2.0
 	github.com/penglongli/gin-metrics v0.1.13
 	github.com/prometheus/client_golang v1.22.0
+	github.com/robfig/cron/v3 v3.0.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/afero v1.12.0
 	github.com/spf13/cobra v1.9.1
