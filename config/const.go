@@ -27,4 +27,5 @@ const (
 
 	KeyFileRoot     = "file.root"
 	KeyFileDatabase = "file.database"
+	KeyFileWebRoot  = "file.web_root"
 )

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/penglongli/gin-metrics/ginmetrics"
 	"github.com/rs/zerolog/log"
@@ -97,14 +98,16 @@ func NewGinEngine(lc fx.Lifecycle, tp trace.TracerProvider) *gin.Engine {
 
 	e.Use(otelgin.Middleware(config.AppName, otelgin.WithTracerProvider(tp)), NewGinLogger(), gin.Recovery())
 
+	if viper.GetBool(config.KeyHTTPEnableCORS) {
+		e.Use(cors.Default())
+	}
+
+	e.Use(static.Serve("/", static.LocalFile(viper.GetString(config.KeyFileWebRoot), true)))
+
 	m := ginmetrics.GetMonitor()
 	m.SetSlowTime(1)
 	m.SetDuration([]float64{0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10})
 	m.UseWithoutExposingEndpoint(e)
-
-	if viper.GetBool(config.KeyHTTPEnableCORS) {
-		e.Use(cors.Default())
-	}
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", viper.GetString(config.KeyHTTPHost), viper.GetInt(config.KeyHTTPPort)),

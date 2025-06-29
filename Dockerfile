@@ -1,3 +1,17 @@
+FROM node:22.16.0-bullseye-slim AS web-builder-base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+COPY ./web/ /src
+WORKDIR /src
+
+FROM web-builder-base AS web-prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+
+FROM web-builder-base AS web-builder
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm run build
+
 FROM golang:1.24.4-bookworm AS builder
 
 WORKDIR /src
@@ -30,11 +44,13 @@ USER ${user}
 
 COPY --from=builder --chown=${uid}:${gid} /src/simple-file-server /usr/bin/simple-file-server
 COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/simple-file-server/config.yaml
+COPY --from=web-builder --chown=${uid}:${gid} /src/dist /usr/share/simple-file-server/html
 
 ENV LOG_COLOR=true
 ENV LOG_LEVEL=info
 ENV LOG_FORMAT=console
 ENV GIN_MODE=release
+ENV FILE_WEB_ROOT=/usr/share/simple-file-server/html
 
 EXPOSE 8080
 

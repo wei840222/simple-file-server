@@ -34,6 +34,7 @@ var (
 
 		KeyFileRoot,
 		KeyFileDatabase,
+		KeyFileWebRoot,
 	}
 )
 

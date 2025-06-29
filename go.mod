@@ -4,6 +4,7 @@ go 1.24.4
 
 require (
 	github.com/gin-contrib/cors v1.7.6
+	github.com/gin-gonic/contrib v0.0.0-20250521004450-2b1292699c15
 	github.com/gin-gonic/gin v1.10.1
 	github.com/grafana/otel-profiling-go v0.5.1
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8
