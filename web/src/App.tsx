@@ -44,8 +44,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto mt-50">
+      <div className="container mx-auto px-4 py-8 flex flex-col justify-center min-h-screen">
+        <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">

@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel/metric"
+	"go.uber.org/ratelimit"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -52,9 +53,12 @@ type UploadHandler struct {
 	logger zerolog.Logger
 	db     *gorm.DB
 	fs     afero.Fs
+	rl     ratelimit.Limiter
 }
 
 func (h *UploadHandler) UploadContent(c *gin.Context) {
+	h.rl.Take()
+
 	// Extract the expiration time from the query parameters, defaulting to 168 hours (7 days).
 	expire, err := time.ParseDuration(c.DefaultQuery("expire", "168h"))
 	if err != nil {
@@ -169,6 +173,7 @@ func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
 		logger: log.With().Str("logger", "uploadHandler").Logger(),
 		db:     db,
 		fs:     afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
+		rl:     ratelimit.New(1),
 	}
 
 	e.POST("/upload", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)
