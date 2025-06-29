@@ -11,4 +11,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "^/(upload|files)": {
+        target: "http://api.simple-file-server.svc.cluster.local",
+      },
+    },
+  },
 });
