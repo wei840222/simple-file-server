@@ -173,7 +173,7 @@ func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider) error {
 		logger: log.With().Str("logger", "uploadHandler").Logger(),
 		db:     db,
 		fs:     afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
-		rl:     ratelimit.New(1),
+		rl:     ratelimit.New(30),
 	}
 
 	e.POST("/upload", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)
