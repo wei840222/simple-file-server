@@ -68,6 +68,14 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		})
 		return
 	}
+	// Validate the expiration time.
+	if expire < 1*time.Minute || expire > 30*24*time.Hour {
+		c.Error(server.ErrInvalidExpireTime)
+		c.AbortWithStatusJSON(http.StatusBadRequest, server.ErrorRes{
+			Error: server.ErrInvalidExpireTime.Error(),
+		})
+		return
+	}
 
 	// Generate a random ID for the upload.
 	id, err := generateRandomID(8)

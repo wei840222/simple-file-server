@@ -10,6 +10,8 @@ var (
 
 	ErrAuthTokenRequired = errors.New("authorization token is required")
 	ErrAuthTokenInvalid  = errors.New("invalid authorization token")
+
+	ErrInvalidExpireTime = errors.New("invalid expiration time")
 )
 
 type ErrorRes struct {

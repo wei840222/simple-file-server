@@ -64,6 +64,7 @@ var rootCmd = &cobra.Command{
 				server.RunO11yHTTPServer,
 				handler.RegisterFileHandler,
 				handler.RegisterUploadHandler,
+				handler.RegisterWebdavHandler,
 				job.RegisterExpireUploadJob,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.With().Str("logger", "fx").Logger())),
