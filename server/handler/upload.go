@@ -141,7 +141,13 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		}
 		panic(err)
 	}
-	path = server.JoinURL(viper.GetString(config.KeyFileWebUploadPath), path)
+
+	if pathOverwrite := c.GetHeader("X-Path-Overwrite"); pathOverwrite != "" {
+		path = server.JoinURL(pathOverwrite, path)
+	} else {
+		path = server.JoinURL(viper.GetString(config.KeyFileWebUploadPath), path)
+	}
+
 	h.logger.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
 
 	c.JSON(http.StatusCreated, gin.H{
