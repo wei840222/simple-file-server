@@ -155,10 +155,10 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 	})
 }
 
-func RegisterFileHandler(e *gin.Engine) {
+func RegisterFileHandler(e *gin.Engine, fs afero.Fs) {
 	h := FileHandler{
 		logger: log.With().Str("logger", "fileHandler").Logger(),
-		fs:     afero.NewBasePathFs(afero.NewOsFs(), viper.GetString(config.KeyFileRoot)),
+		fs:     fs,
 	}
 
 	files := e.Group("/files")

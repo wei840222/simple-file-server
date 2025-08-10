@@ -12,7 +12,7 @@ FROM web-builder-base AS web-builder
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build
 
-FROM golang:1.24.4-bookworm AS builder
+FROM golang:1.24.5-bookworm AS builder
 
 WORKDIR /src
 
@@ -45,11 +45,14 @@ USER ${user}
 COPY --from=builder --chown=${uid}:${gid} /src/simple-file-server /usr/bin/simple-file-server
 COPY --from=builder --chown=${uid}:${gid} /src/config/config.yaml /etc/simple-file-server/config.yaml
 COPY --from=web-builder --chown=${uid}:${gid} /src/dist /usr/share/simple-file-server/html
+RUN mkdir -p /usr/share/simple-file-server/data && chown ${uid}:${gid} /usr/share/simple-file-server/data
 
 ENV LOG_COLOR=true
 ENV LOG_LEVEL=info
 ENV LOG_FORMAT=console
 ENV GIN_MODE=release
+ENV FILE_ROOT=/usr/share/simple-file-server/data/files
+ENV FILE_DATABASE=/usr/share/simple-file-server/data/sqlite.db
 ENV FILE_WEB_ROOT=/usr/share/simple-file-server/html
 
 EXPOSE 8080

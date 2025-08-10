@@ -12,17 +12,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
-	"github.com/wei840222/simple-file-server/config"
+	"github.com/spf13/afero"
 	"golang.org/x/net/webdav"
+
+	"github.com/wei840222/simple-file-server/server"
 )
 
 const (
 	style     = `<style>table {border-collapse: separate;border-spacing: 1.5em 0.25em;}h1 {padding-left: 0.3em;}a {text-decoration: none;color: blue;}.left {text-align: left;}.mono {font-family: monospace;}.mw20 {min-width: 20em;}</style>`
 	meta      = `<meta name="referrer" content="no-referrer" />`
 	listIndex = `<tr><th class="left mw20">Name</th><th class="left">Last modified</th><th>Size</th></tr><tr><th colspan="3"><hr></th></tr>`
-	homeDIr   = "<tr><td><a href=\"%s\">Home Dir</a></td><td>&nbsp;</td><td class=\"mono\" align=\"right\">[DIR]</td></tr>"
-	perDir    = `<td><a href="..">Pre Dir</a></td><td>&nbsp;</td><td class="mono" align="right">[DIR]</td></tr>`
+	homeDIr   = "<tr><td><a href=\"%s\">🏠 Home Dir</a></td><td>&nbsp;</td><td class=\"mono\" align=\"right\">[DIR]</td></tr>"
+	perDir    = `<td><a href="..">↩️ Pre Dir</a></td><td>&nbsp;</td><td class="mono" align="right">[DIR]</td></tr>`
 	fileuri   = "<tr><td><a href=\"%s\" >%s</a></td><td class=\"mono\">%s</td><td class=\"mono\" align=\"right\">%s</td></tr>"
 )
 
@@ -119,12 +120,12 @@ func (h *WebdavHandler) HandlerRequest(c *gin.Context) {
 	h.fs.ServeHTTP(c.Writer, c.Request)
 }
 
-func RegisterWebdavHandler(e *gin.Engine) {
+func RegisterWebdavHandler(e *gin.Engine, fs afero.Fs) {
 	h := WebdavHandler{
 		logger: log.With().Str("logger", "webdavHandler").Logger(),
 		fs: webdav.Handler{
 			Prefix:     "/webdav",
-			FileSystem: webdav.Dir(viper.GetString(config.KeyFileRoot)),
+			FileSystem: server.AferoFSWebdavAdapter(fs),
 			LockSystem: webdav.NewMemLS(),
 		},
 	}

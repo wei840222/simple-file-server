@@ -30,3 +30,4 @@
 #   root: "./data/files"
 #   database: "./data/sqlite.db"
 #   web_root: "./web/dist"
+#   web_upload_path: "./files"

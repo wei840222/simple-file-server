@@ -25,7 +25,8 @@ const (
 	KeyHTTPIdleTimeout     = "http.idle_timeout"
 	KeyHTTPShutdownTimeout = "http.shutdown_timeout"
 
-	KeyFileRoot     = "file.root"
-	KeyFileDatabase = "file.database"
-	KeyFileWebRoot  = "file.web_root"
+	KeyFileRoot          = "file.root"
+	KeyFileDatabase      = "file.database"
+	KeyFileWebRoot       = "file.web_root"
+	KeyFileWebUploadPath = "file.web_upload_path"
 )

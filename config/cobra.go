@@ -35,6 +35,7 @@ var (
 		KeyFileRoot,
 		KeyFileDatabase,
 		KeyFileWebRoot,
+		KeyFileWebUploadPath,
 	}
 )
 
