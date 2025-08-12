@@ -25,8 +25,13 @@ const (
 	KeyHTTPIdleTimeout     = "http.idle_timeout"
 	KeyHTTPShutdownTimeout = "http.shutdown_timeout"
 
-	KeyFileRoot          = "file.root"
-	KeyFileDatabase      = "file.database"
-	KeyFileWebRoot       = "file.web_root"
-	KeyFileWebUploadPath = "file.web_upload_path"
+	KeyFileRoot                     = "file.root"
+	KeyFileGarbageCollectionPattern = "file.garbage_collection_pattern"
+	KeyFileDatabase                 = "file.database"
+	KeyFileWebRoot                  = "file.web_root"
+	KeyFileWebUploadPath            = "file.web_upload_path"
+
+	KeyTemporalAddress   = "temporal.address"
+	KeyTemporalNamespace = "temporal.namespace"
+	KeyTemporalTaskQueue = "temporal.task_queue"
 )

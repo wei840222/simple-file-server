@@ -95,7 +95,7 @@ func (h *WebdavHandler) handleDirList(fs webdav.FileSystem, c *gin.Context) bool
 	filePath := c.Params.ByName("webdav")
 	f, err := fs.OpenFile(c, filePath, os.O_RDONLY, 0)
 	if err != nil {
-		h.logger.Warn().Err(err).Str("path", filePath).Msg("Failed to open file for directory listing")
+		h.logger.Warn().Ctx(c).Err(err).Str("path", filePath).Msg("Failed to open file for directory listing")
 		return false
 	}
 	defer f.Close()
@@ -113,7 +113,7 @@ func (h *WebdavHandler) handleDirList(fs webdav.FileSystem, c *gin.Context) bool
 }
 
 func (h *WebdavHandler) HandlerRequest(c *gin.Context) {
-	h.logger.Debug().Msg("WebDAV request received")
+	h.logger.Debug().Ctx(c).Msg("WebDAV request received")
 	if c.Request.Method == http.MethodGet && h.handleDirList(h.fs.FileSystem, c) {
 		return
 	}

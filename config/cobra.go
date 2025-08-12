@@ -33,9 +33,14 @@ var (
 		KeyHTTPShutdownTimeout,
 
 		KeyFileRoot,
+		KeyFileGarbageCollectionPattern,
 		KeyFileDatabase,
 		KeyFileWebRoot,
 		KeyFileWebUploadPath,
+
+		KeyTemporalAddress,
+		KeyTemporalNamespace,
+		KeyTemporalTaskQueue,
 	}
 )
 

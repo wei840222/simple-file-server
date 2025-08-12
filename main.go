@@ -33,7 +33,7 @@ var rootCmd = &cobra.Command{
 		config.InitZerolog()
 
 		if viper.GetBool(config.KeyHTTPEnableAuth) && len(viper.GetStringSlice(config.KeyHTTPReadOnlyTokens)) == 0 && len(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)) == 0 {
-			logger.Info().Msg("authentication is enabled but no tokens provided. generating random tokens")
+			logger.Info().Ctx(cmd.Context()).Msg("authentication is enabled but no tokens provided. generating random tokens")
 			readOnlyToken, err := generateToken()
 			if err != nil {
 				return err
@@ -44,11 +44,11 @@ var rootCmd = &cobra.Command{
 			}
 			viper.Set(config.KeyHTTPReadOnlyTokens, readOnlyToken)
 			viper.Set(config.KeyHTTPReadWriteTokens, readWriteToken)
-			logger.Info().Msgf("generated read only token: %s", readOnlyToken)
-			logger.Info().Msgf("generated read write token: %s", readWriteToken)
+			logger.Info().Ctx(cmd.Context()).Msgf("generated read only token: %s", readOnlyToken)
+			logger.Info().Ctx(cmd.Context()).Msgf("generated read write token: %s", readWriteToken)
 		}
 
-		logger.Info().Any("config", viper.AllSettings()).Msg("config loaded")
+		logger.Info().Ctx(cmd.Context()).Any("config", viper.AllSettings()).Msg("config loaded")
 
 		return nil
 	},
@@ -59,6 +59,8 @@ var rootCmd = &cobra.Command{
 				server.NewTracerProvider,
 				server.NewGinEngine,
 				server.NewAferoFS,
+				job.NewTemporalClient,
+				job.NewTemporalWorker,
 				job.NewCronjob,
 			),
 			fx.Invoke(
@@ -66,6 +68,7 @@ var rootCmd = &cobra.Command{
 				handler.RegisterFileHandler,
 				handler.RegisterUploadHandler,
 				handler.RegisterWebdavHandler,
+				job.RegisterFileGarbageCollectionWorkflow,
 				job.RegisterExpireUploadJob,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.With().Str("logger", "fx").Logger())),
@@ -99,9 +102,14 @@ func main() {
 	rootCmd.PersistentFlags().Duration(config.FlagReplacer.Replace(config.KeyHTTPShutdownTimeout), 15*time.Second, "Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms').")
 
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), "./data/files", "Path to save uploaded files.")
+	rootCmd.PersistentFlags().StringSlice(config.FlagReplacer.Replace(config.KeyFileGarbageCollectionPattern), []string{`^\._.+`, `^\.DS_Store$`}, "Regular expressions to match files for garbage collection. Files matching these patterns will be deleted.")
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileDatabase), "./data/sqlite.db", "Path to the SQLite database file. If the file does not exist, it will be created.")
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileWebRoot), "./web/dist", "Path to the web root directory. This is used to serve the static files for the web interface.")
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileWebUploadPath), "./files", "Path of the upload api response.")
+
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyTemporalAddress), "localhost:7233", "Temporal server address.")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyTemporalNamespace), "default", "Temporal namespace.")
+	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyTemporalTaskQueue), "SIMPLE_FILE_SERVER:FILES", "Temporal task queue.")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

@@ -148,7 +148,7 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		path = server.JoinURL(viper.GetString(config.KeyFileWebUploadPath), path)
 	}
 
-	h.logger.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
+	h.logger.Debug().Ctx(c).Str("path", path).Int64("bytes", written).Msg("uploaded file")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "file created successfully",

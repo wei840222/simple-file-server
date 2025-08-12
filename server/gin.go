@@ -78,14 +78,14 @@ func NewGinLogger(notLogged ...string) gin.HandlerFunc {
 		)
 
 		if len(c.Errors) > 0 {
-			logger.Error().Fields(entry).Msg(strings.TrimSpace(c.Errors.ByType(gin.ErrorTypePrivate).String()))
+			logger.Error().Ctx(c).Fields(entry).Msg(strings.TrimSpace(c.Errors.ByType(gin.ErrorTypePrivate).String()))
 		}
 		if status >= http.StatusInternalServerError {
-			logger.Error().Fields(entry).Msg(msg)
+			logger.Error().Ctx(c).Fields(entry).Msg(msg)
 		} else if status >= http.StatusBadRequest {
-			logger.Warn().Fields(entry).Msg(msg)
+			logger.Warn().Ctx(c).Fields(entry).Msg(msg)
 		} else {
-			logger.Info().Fields(entry).Msg(msg)
+			logger.Info().Ctx(c).Fields(entry).Msg(msg)
 		}
 	}
 }

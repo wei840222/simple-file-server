@@ -28,6 +28,14 @@
 
 # file:
 #   root: "./data/files"
+#   garbage_collection_pattern:
+#    - ^\._.+
+#    - ^\.DS_Store$
 #   database: "./data/sqlite.db"
 #   web_root: "./web/dist"
 #   web_upload_path: "./files"
+
+# temporal:
+#   address: localhost:7233
+#   namespace: default
+#   task_queue: "SIMPLE_FILE_SERVER:FILES"

@@ -26,7 +26,7 @@ type FileHandler struct {
 
 func (h *FileHandler) ServeContent(c *gin.Context) {
 	path := strings.TrimPrefix(c.Param("path"), "/")
-	h.logger.Debug().Str("path", path).Msg("checking if file exists")
+	h.logger.Debug().Ctx(c).Str("path", path).Msg("checking if file exists")
 
 	if path == "" {
 		c.Error(server.ErrFileNotFound)
@@ -55,7 +55,7 @@ func (h *FileHandler) ServeContent(c *gin.Context) {
 	}
 
 	if fi.IsDir() {
-		h.logger.Debug().Str("path", path).Msg("path is a directory")
+		h.logger.Debug().Ctx(c).Str("path", path).Msg("path is a directory")
 		c.Error(server.ErrFileNotFound)
 		c.AbortWithStatusJSON(http.StatusNotFound, server.ErrorRes{
 			Error: server.ErrFileNotFound.Error(),
@@ -141,7 +141,7 @@ func (h *FileHandler) UploadContent(c *gin.Context) {
 		}
 		panic(err)
 	}
-	h.logger.Debug().Str("path", path).Int64("bytes", written).Msg("uploaded file")
+	h.logger.Debug().Ctx(c).Str("path", path).Int64("bytes", written).Msg("uploaded file")
 
 	if !exists {
 		c.JSON(http.StatusCreated, gin.H{
