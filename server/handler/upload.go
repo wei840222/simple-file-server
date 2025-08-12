@@ -3,6 +3,7 @@ package handler
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -16,12 +17,10 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel/metric"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
-	"gorm.io/plugin/opentelemetry/tracing"
+	"go.temporal.io/sdk/client"
 
 	"github.com/wei840222/simple-file-server/config"
+	"github.com/wei840222/simple-file-server/job"
 	"github.com/wei840222/simple-file-server/server"
 	"github.com/wei840222/simple-file-server/server/middleware"
 )
@@ -49,9 +48,9 @@ type Upload struct {
 }
 
 type UploadHandler struct {
-	logger zerolog.Logger
-	db     *gorm.DB
-	fs     afero.Fs
+	logger         zerolog.Logger
+	fs             afero.Fs
+	temporalClient client.Client
 }
 
 func (h *UploadHandler) UploadContent(c *gin.Context) {
@@ -90,16 +89,14 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	}
 
 	fileExtension := filepath.Ext(fh.Filename)
+	path := id + fileExtension
 
-	upload := Upload{
-		ID:            id,
-		FileExtension: fileExtension,
-		CreatedAt:     time.Now(),
-		ExpiredAt:     time.Now().Add(expire),
-	}
-
-	if err := h.db.WithContext(c).Create(&upload).Error; err != nil {
-		panic(err)
+	// Check if the error indicates that the file does not exist
+	if _, err := h.fs.Stat(path); err == nil {
+		panic(fmt.Errorf("file '%s' already exists", path))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		// Handle other potential errors (e.g., permissions issues)
+		panic(fmt.Errorf("error checking file '%s': %w", path, err))
 	}
 
 	f, err := fh.Open()
@@ -114,13 +111,6 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 
 	src := http.MaxBytesReader(c.Writer, f, viper.GetInt64(config.KeyHTTPMaxUploadSize))
 	defer src.Close()
-
-	path := id + fileExtension
-	// Ensure the directories exist.
-	dirsPath := filepath.Dir(path)
-	if err := h.fs.MkdirAll(dirsPath, 0755); err != nil {
-		panic(err)
-	}
 
 	dstFile, err := h.fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
@@ -142,6 +132,14 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 		panic(err)
 	}
 
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue:  viper.GetString(config.KeyTemporalTaskQueue),
+		StartDelay: expire + 5*time.Minute,
+	}
+	if _, err := h.temporalClient.ExecuteWorkflow(c, workflowOptions, job.FileExpireWorkflow, path); err != nil {
+		panic(err)
+	}
+
 	if pathOverwrite := c.GetHeader("X-Path-Overwrite"); pathOverwrite != "" {
 		path = server.JoinURL(pathOverwrite, path)
 	} else {
@@ -156,35 +154,11 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	})
 }
 
-func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider, fs afero.Fs) error {
-	logger := log.With().Str("logger", "gorm").Logger()
-
-	db, err := gorm.Open(sqlite.Open(viper.GetString(config.KeyFileDatabase)), &gorm.Config{
-		Logger: gormlogger.New(
-			&logger,
-			gormlogger.Config{
-				SlowThreshold:             time.Second,
-				LogLevel:                  gormlogger.Info,
-				IgnoreRecordNotFoundError: true,
-				ParameterizedQueries:      false,
-				Colorful:                  false,
-			},
-		),
-	})
-	if err != nil {
-		return err
-	}
-	if err := db.Use(tracing.NewPlugin()); err != nil {
-		return err
-	}
-	if err := db.AutoMigrate(&Upload{}); err != nil {
-		return err
-	}
-
+func RegisterUploadHandler(e *gin.Engine, _ metric.MeterProvider, fs afero.Fs, c client.Client) error {
 	h := UploadHandler{
-		logger: log.With().Str("logger", "uploadHandler").Logger(),
-		db:     db,
-		fs:     fs,
+		logger:         log.With().Str("logger", "uploadHandler").Logger(),
+		fs:             fs,
+		temporalClient: c,
 	}
 
 	e.POST("/upload", middleware.NewTokenAuth(viper.GetStringSlice(config.KeyHTTPReadWriteTokens)), h.UploadContent)

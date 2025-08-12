@@ -6,7 +6,6 @@ Simple HTTP server to save files
 - [Usage](#usage)
 - [Authentication](#authentication)
 - [Timeouts](#timeouts)
-- [Database](#database)
 - [Observability](#observability)
 - [File Storage](#file-storage)
 - [API](#api)
@@ -22,7 +21,6 @@ Simple HTTP server to save files
 - **Random filename generation**: `/upload` endpoint generates unique filenames automatically
 - **Authentication support**: Token-based authentication with read-only and read-write permissions
 - **CORS support**: Enable cross-origin requests when needed
-- **SQLite database**: Tracks uploaded files with metadata and expiration
 - **Configurable timeouts**: Fine-tune read, write, idle, and shutdown timeouts
 - **Observability**: Built-in metrics and tracing support
 - **File size limits**: Configurable maximum upload size
@@ -31,48 +29,31 @@ Simple HTTP server to save files
 ## Usage
 
 ```
-  --log-color
-        Log color (default true)
-  --log-format string
-        Log format (default "console")
-  --log-level string
-        Log level (default "debug")
-
-  --o11y-host string
-        Observability server host (default "0.0.0.0")
-  --o11y-port int
-        Observability server port (default 9090)
-
-  --file-database string
-        Path to the SQLite database file. If the file does not exist, it will be created. (default "./data/sqlite.db")
-  --file-root string
-        Path to save uploaded files. (default "./data/files")
-
-  --gin-mode string
-        Gin mode (default "debug")
-
-  --http-host string
-        HTTP server host (default "0.0.0.0")
-  --http-port int
-        HTTP server port (default 8080)
-  --http-enable-cors
-        Enable CORS header
-  --http-enable-auth
-        Enable authentication
-  --http-read-only-tokens strings
-        Comma separated list of read only tokens
-  --http-read-write-tokens strings
-        Comma separated list of read write tokens
-  --http-max-upload-size int
-        Maximum upload size in bytes (default 5242880)
-  --http-read-timeout duration
-        Read timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 15s)
-  --http-write-timeout duration
-        Write timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 5m0s)
-  --http-idle-timeout duration
-        Idle timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 1m0s)
-  --http-shutdown-timeout duration
-        Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 15s)
+      --file-garbage-collection-pattern strings   Regular expressions to match files for garbage collection. Files matching these patterns will be deleted. (default [^\._.+,^\.DS_Store$])
+      --file-root string                          Path to save uploaded files. (default "./data/files")
+      --file-web-root string                      Path to the web root directory. This is used to serve the static files for the web interface. (default "./web/dist")
+      --file-web-upload-path string               Path of the upload api response. (default "./files")
+      --gin-mode string                           Gin mode (default "debug")
+  -h, --help                                      help for simple-file-server
+      --http-enable-auth                          Enable authentication
+      --http-enable-cors                          Enable CORS header
+      --http-host string                          HTTP server host (default "0.0.0.0")
+      --http-idle-timeout duration                Idle timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 1m0s)
+      --http-max-upload-size int                  Maximum upload size in bytes (default 5242880)
+      --http-port int                             HTTP server port (default 8080)
+      --http-read-only-tokens strings             Comma separated list of read only tokens
+      --http-read-timeout duration                Read timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 15s)
+      --http-read-write-tokens strings            Comma separated list of read write tokens
+      --http-shutdown-timeout duration            Graceful shutdown timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 15s)
+      --http-write-timeout duration               Write timeout. zero or negative value means no timeout. can be suffixed by the time units (e.g. '1s', '500ms'). (default 5m0s)
+      --log-color                                 Log color (default true)
+      --log-format string                         Log format (default "console")
+      --log-level string                          Log level (default "debug")
+      --o11y-host string                          Observability server host (default "0.0.0.0")
+      --o11y-port int                             Observability server port (default 9090)
+      --temporal-address string                   Temporal server address. (default "localhost:7233")
+      --temporal-namespace string                 Temporal namespace. (default "default")
+      --temporal-task-queue string                Temporal task queue. (default "SIMPLE_FILE_SERVER:FILES")
 ```
 
 The server supports configuration via command line flags, environment variables, and configuration files. Command line flags take precedence over environment variables, which take precedence over configuration files.
@@ -106,16 +87,6 @@ In these cases, the server responds with `401 Unauthorized` with body like: `{"e
 
 No one can request write operations if you configure the server with read-only tokens only.
 As a result, the server operates in read-only mode.
-
-## Database
-
-The server uses SQLite to track uploaded files with metadata including:
-
-- File ID and extension
-- Creation and expiration timestamps
-- File path mapping
-
-The database file location can be configured with `--file-database` flag (default: `./data/sqlite.db`).
 
 ## Observability
 

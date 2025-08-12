@@ -61,15 +61,13 @@ var rootCmd = &cobra.Command{
 				server.NewAferoFS,
 				job.NewTemporalClient,
 				job.NewTemporalWorker,
-				job.NewCronjob,
 			),
 			fx.Invoke(
 				server.RunO11yHTTPServer,
 				handler.RegisterFileHandler,
 				handler.RegisterUploadHandler,
 				handler.RegisterWebdavHandler,
-				job.RegisterFileGarbageCollectionWorkflow,
-				job.RegisterExpireUploadJob,
+				job.RegisterFileWorkflows,
 			),
 			fx.WithLogger(fxlogger.WithZerolog(log.With().Str("logger", "fx").Logger())),
 			fx.StopTimeout(3*viper.GetDuration(config.KeyHTTPShutdownTimeout)),
@@ -103,7 +101,6 @@ func main() {
 
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileRoot), "./data/files", "Path to save uploaded files.")
 	rootCmd.PersistentFlags().StringSlice(config.FlagReplacer.Replace(config.KeyFileGarbageCollectionPattern), []string{`^\._.+`, `^\.DS_Store$`}, "Regular expressions to match files for garbage collection. Files matching these patterns will be deleted.")
-	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileDatabase), "./data/sqlite.db", "Path to the SQLite database file. If the file does not exist, it will be created.")
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileWebRoot), "./web/dist", "Path to the web root directory. This is used to serve the static files for the web interface.")
 	rootCmd.PersistentFlags().String(config.FlagReplacer.Replace(config.KeyFileWebUploadPath), "./files", "Path of the upload api response.")
 

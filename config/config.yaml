@@ -31,7 +31,6 @@
 #   garbage_collection_pattern:
 #    - ^\._.+
 #    - ^\.DS_Store$
-#   database: "./data/sqlite.db"
 #   web_root: "./web/dist"
 #   web_upload_path: "./files"
 

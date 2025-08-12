@@ -27,7 +27,6 @@ const (
 
 	KeyFileRoot                     = "file.root"
 	KeyFileGarbageCollectionPattern = "file.garbage_collection_pattern"
-	KeyFileDatabase                 = "file.database"
 	KeyFileWebRoot                  = "file.web_root"
 	KeyFileWebUploadPath            = "file.web_upload_path"
 

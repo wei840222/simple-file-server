@@ -52,7 +52,6 @@ ENV LOG_LEVEL=info
 ENV LOG_FORMAT=console
 ENV GIN_MODE=release
 ENV FILE_ROOT=/usr/share/simple-file-server/data/files
-ENV FILE_DATABASE=/usr/share/simple-file-server/data/sqlite.db
 ENV FILE_WEB_ROOT=/usr/share/simple-file-server/html
 
 EXPOSE 8080

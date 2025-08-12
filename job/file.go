@@ -60,10 +60,10 @@ func (a *FileActivities) ListByPattern(ctx context.Context, pattern []string) ([
 }
 
 func (a *FileActivities) Delete(ctx context.Context, path string) error {
-	// if err := a.fs.Remove(path); err != nil {
-	// 	a.logger.Warn().Ctx(ctx).Err(err).Str("path", path).Msg("failed to delete file")
-	// 	return err
-	// }
+	if err := a.fs.Remove(path); err != nil {
+		a.logger.Warn().Ctx(ctx).Err(err).Str("path", path).Msg("failed to delete file")
+		return err
+	}
 
 	a.logger.Info().Ctx(ctx).Str("path", path).Msg("file deleted successfully")
 
@@ -75,6 +75,25 @@ func NewFileActivities(fs afero.Fs) *FileActivities {
 		logger: log.With().Str("logger", "fileActivity").Logger(),
 		fs:     fs,
 	}
+}
+
+func FileExpireWorkflow(ctx workflow.Context, path string) error {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    time.Second,
+			MaximumInterval:    15 * time.Second,
+			BackoffCoefficient: 2,
+			MaximumAttempts:    3,
+		},
+	})
+
+	var fileActivities *FileActivities
+	if err := workflow.ExecuteActivity(ctx, fileActivities.Delete, path).Get(ctx, nil); err != nil {
+		return fmt.Errorf("failed to delete file: %s", err)
+	}
+
+	return nil
 }
 
 func FileGarbageCollectionWorkflow(ctx workflow.Context) error {
@@ -104,11 +123,12 @@ func FileGarbageCollectionWorkflow(ctx workflow.Context) error {
 	return nil
 }
 
-func RegisterFileGarbageCollectionWorkflow(lc fx.Lifecycle, c client.Client, w worker.Worker, fs afero.Fs) error {
+func RegisterFileWorkflows(lc fx.Lifecycle, c client.Client, w worker.Worker, fs afero.Fs) error {
 	w.RegisterActivity(&FileActivities{
 		logger: log.With().Str("logger", "fileActivities").Logger(),
 		fs:     fs,
 	})
+	w.RegisterWorkflow(FileExpireWorkflow)
 	w.RegisterWorkflow(FileGarbageCollectionWorkflow)
 
 	hostname, err := os.Hostname()
@@ -124,7 +144,7 @@ func RegisterFileGarbageCollectionWorkflow(lc fx.Lifecycle, c client.Client, w w
 				Spec: client.ScheduleSpec{
 					Intervals: []client.ScheduleIntervalSpec{
 						{
-							Every: 5 * time.Second,
+							Every: 5 * time.Minute,
 						},
 					},
 				},

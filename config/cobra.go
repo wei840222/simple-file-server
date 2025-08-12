@@ -34,7 +34,6 @@ var (
 
 		KeyFileRoot,
 		KeyFileGarbageCollectionPattern,
-		KeyFileDatabase,
 		KeyFileWebRoot,
 		KeyFileWebUploadPath,
 
