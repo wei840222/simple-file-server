@@ -112,6 +112,14 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 	src := http.MaxBytesReader(c.Writer, f, viper.GetInt64(config.KeyHTTPMaxUploadSize))
 	defer src.Close()
 
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue:  viper.GetString(config.KeyTemporalTaskQueue),
+		StartDelay: expire + 5*time.Minute,
+	}
+	if _, err := h.temporalClient.ExecuteWorkflow(c, workflowOptions, job.FileExpireWorkflow, path); err != nil {
+		panic(err)
+	}
+
 	dstFile, err := h.fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		panic(err)
@@ -129,14 +137,6 @@ func (h *UploadHandler) UploadContent(c *gin.Context) {
 			})
 			return
 		}
-		panic(err)
-	}
-
-	workflowOptions := client.StartWorkflowOptions{
-		TaskQueue:  viper.GetString(config.KeyTemporalTaskQueue),
-		StartDelay: expire + 5*time.Minute,
-	}
-	if _, err := h.temporalClient.ExecuteWorkflow(c, workflowOptions, job.FileExpireWorkflow, path); err != nil {
 		panic(err)
 	}
 
